@@ -1,0 +1,593 @@
+{
+  "_notes": [
+    "Source of truth for names/prices marked menuConfirmed:true is the DE.25 printed menu flyer.",
+    "Items marked menuConfirmed:false have a real DE.25 product photo but are NOT on that flyer — confirm the name and set a real price before this goes live.",
+    "Nutrition (calories/protein/carbohydrates/fat/sugar) is intentionally null for every item: DE.25 has not provided lab-confirmed nutrition figures. Never fill these with estimates — the frontend and AI guide both show 'Nutrition information coming soon.' when null.",
+    "Allergens are intentionally null unless confirmed — the frontend/AI guide show a clear 'not confirmed, contact DE.25' message rather than guessing.",
+    "Ingredient lists are a best-effort read of each product photo, not a lab-verified recipe — flagged via ingredientsConfirmed:false.",
+    "Dark Chocolate Cake and Fruit Cake were added at the owner's request without a real DE.25 photo available yet — photoConfirmed:false + photoNote flags this on both, and their images are illustrated concept SVGs (public/images/dark-chocolate-cake.svg, public/images/fruit-cake.svg), never a fabricated photograph. Replace the image field and set photoConfirmed:true once DE.25 supplies a real photo; confirm name/price the same way as any other menuConfirmed:false item.",
+    "2026-09-26: Owner supplied real product photos (via chat upload) for Blueberry Cheesecake (refreshed), Ragi Jaggery Brownie, Dark Chocolate Cake and Fruit Cake. The two illustrated concept SVGs for Dark Chocolate Cake and Fruit Cake were replaced by these real photos and removed from public/images; both are now photoConfirmed. Name/price for Dark Chocolate Cake and Fruit Cake are still unconfirmed against DE.25's printed menu (see priceNote) — only the photo status changed. Also added a dedicated Cakes & Pastries page (public/cakes.html) that showcases the 'cakes' category on its own, linked from the main nav and the homepage's Cakes category card.",
+    "2026-09-26: public/cakes.html now shows the 'brownies' category alongside 'cakes' (data-category-lock=\"cakes,brownies\" in menu.js) at the owner's request, since the page is named Cakes & Pastries. No product data changed for this — it's purely which categories that one page's grid includes.",
+    "2026-09-26: Reverted public/cakes.html to data-category-lock=\"cakes\" only (dropping brownies again) per owner feedback clarifying that \"pastries\" already refers to items inside the cakes category (e.g. Chocolate Truffle Loaf) — brownies remain a separate homepage-only category. No product data changed; this is purely which categories that one page's grid includes.",
+    "2026-09-26: Split the old \"cakes\" (8 items) and \"brownies\" (3 items) categories per the owner's request for separate Cakes and Pastries nav pages. \"cakes\" now holds only Blueberry Cheesecake, Dark Chocolate Cake and Fruit Cake (3 items). Everything else that used to be \"cakes\" or \"brownies\" — Classic Cheesecake, Nutella Cheesecake, Tiramisu, Chocolate Truffle Loaf, Chocolate Crunch Mousse Cake, Classic Chocolate Brownie, Nutella Brownie, Ragi Jaggery Brownie — is now category \"pastries\" (8 items), shown on the new public/pastries.html page. No names/prices/photos changed, only the category field."
+  ],
+  "products": [
+    {
+      "productId": "blueberry-cheesecake",
+      "name": "Blueberry Cheesecake",
+      "category": "cakes",
+      "description": "A creamy baked cheesecake finished with blueberry compote and fresh blueberries.",
+      "price": 150,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/blueberry-cheesecake.jpg",
+      "gallery": [
+        "images/blueberry-cheesecake.jpg"
+      ],
+      "ingredients": [
+        "cream cheese",
+        "blueberry compote",
+        "fresh blueberries",
+        "digestive biscuit base",
+        "sugar"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 jar (approx. 150 g)",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": true,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "classic-cheesecake",
+      "name": "Classic Cheesecake",
+      "category": "pastries",
+      "description": "A simple, honest baked cheesecake on a digestive biscuit base.",
+      "price": 130,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/classic-cheesecake.jpg",
+      "gallery": [
+        "images/classic-cheesecake.jpg"
+      ],
+      "ingredients": [
+        "cream cheese",
+        "digestive biscuit base",
+        "sugar",
+        "eggs",
+        "vanilla"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 jar (approx. 150 g)",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "nutella-cheesecake",
+      "name": "Nutella Cheesecake",
+      "category": "pastries",
+      "description": "Baked cheesecake finished with a Nutella and hazelnut top layer.",
+      "price": 150,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/nutella-cheesecake.jpg",
+      "gallery": [
+        "images/nutella-cheesecake.jpg"
+      ],
+      "ingredients": [
+        "cream cheese",
+        "nutella",
+        "hazelnut",
+        "digestive biscuit base",
+        "sugar"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 jar (approx. 150 g)",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [
+        "contains nuts"
+      ],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "tiramisu",
+      "name": "Tiramisu",
+      "category": "pastries",
+      "description": "Coffee-soaked layers with a mascarpone cream top and a cocoa-dusted finish.",
+      "price": 150,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/tiramisu.jpg",
+      "gallery": [
+        "images/tiramisu.jpg"
+      ],
+      "ingredients": [
+        "mascarpone",
+        "coffee-soaked sponge",
+        "cocoa dust",
+        "eggs",
+        "sugar"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 jar (approx. 150 g)",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "ragi-jaggery-brownie",
+      "name": "Ragi Jaggery Brownie",
+      "category": "pastries",
+      "description": "A gluten-free brownie made with ragi (finger millet) flour and jaggery instead of refined sugar.",
+      "price": 70,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/ragi-jaggery-brownie.jpg",
+      "gallery": [
+        "images/ragi-jaggery-brownie.jpg"
+      ],
+      "ingredients": [
+        "ragi flour",
+        "jaggery",
+        "cocoa",
+        "eggs",
+        "butter"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 piece",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [
+        "gluten-free"
+      ],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "classic-chocolate-brownie",
+      "name": "Classic Chocolate Brownie",
+      "category": "pastries",
+      "description": "A fudgy dark chocolate brownie with a glossy ganache top.",
+      "price": 60,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/classic-chocolate-brownie.jpg",
+      "gallery": [
+        "images/classic-chocolate-brownie.jpg"
+      ],
+      "ingredients": [
+        "dark chocolate",
+        "cocoa",
+        "refined flour",
+        "eggs",
+        "butter"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 piece",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "nutella-brownie",
+      "name": "Nutella Brownie",
+      "category": "pastries",
+      "description": "A brownie finished with a swirled Nutella and hazelnut topping, available on a ragi or classic base.",
+      "price": 80,
+      "menuConfirmed": true,
+      "priceNote": "Menu lists two base options at different prices — see variants.",
+      "variants": [
+        {
+          "label": "Classic base",
+          "price": 80
+        },
+        {
+          "label": "Ragi base",
+          "price": 90
+        }
+      ],
+      "image": "images/nutella-brownie.jpg",
+      "gallery": [
+        "images/nutella-brownie.jpg"
+      ],
+      "ingredients": [
+        "nutella",
+        "hazelnut",
+        "cocoa",
+        "refined flour or ragi flour",
+        "eggs"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 piece",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [
+        "contains nuts"
+      ],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "korean-bun",
+      "name": "Korean Bun",
+      "category": "savouries",
+      "description": "A soft milk-bread bun with a garlic butter glaze, herbs and chili flakes.",
+      "price": 140,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/korean-bun.jpg",
+      "gallery": [
+        "images/korean-bun.jpg"
+      ],
+      "ingredients": [
+        "milk bread dough",
+        "garlic butter glaze",
+        "herbs",
+        "chili flakes"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 bun",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": true,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "hot-chocolate",
+      "name": "Hot Chocolate",
+      "category": "sips",
+      "description": "Rich dark chocolate melted into steamed milk.",
+      "price": 90,
+      "menuConfirmed": true,
+      "priceNote": "The reference photo for this item shows it served over ice — confirm with DE.25 whether to relabel this as an iced variant or swap in a hot-serve photo.",
+      "image": "images/hot-chocolate.jpg",
+      "gallery": [
+        "images/hot-chocolate.jpg"
+      ],
+      "ingredients": [
+        "dark chocolate",
+        "milk",
+        "sugar"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 cup",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "chocolate-milkshake",
+      "name": "Chocolate Milkshake",
+      "category": "sips",
+      "description": "A thick blended chocolate milkshake finished with chocolate shavings.",
+      "price": 90,
+      "menuConfirmed": true,
+      "priceNote": null,
+      "image": "images/choc-milkshake.jpg",
+      "gallery": [
+        "images/choc-milkshake.jpg"
+      ],
+      "ingredients": [
+        "milk",
+        "chocolate",
+        "ice cream",
+        "chocolate shavings"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 glass",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "loaded-nachos",
+      "name": "Loaded Nachos",
+      "category": "savouries",
+      "description": "Corn tortilla chips loaded with salsa, cheese sauce and a balsamic drizzle.",
+      "price": 150,
+      "menuConfirmed": false,
+      "priceNote": "Not on the current printed menu flyer — confirm the real price before publishing.",
+      "image": "images/loaded-nachos.jpg",
+      "gallery": [
+        "images/loaded-nachos.jpg"
+      ],
+      "ingredients": [
+        "corn tortilla chips",
+        "salsa",
+        "cheese sauce",
+        "balsamic drizzle",
+        "mixed vegetables"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 plate",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "chocolate-truffle-loaf",
+      "name": "Chocolate Truffle Loaf",
+      "category": "pastries",
+      "description": "A layered chocolate loaf cake finished with a chocolate ganache glaze.",
+      "price": 220,
+      "menuConfirmed": false,
+      "priceNote": "Not on the current printed menu flyer — confirm the real price before publishing.",
+      "image": "images/choc-truffle-loaf.jpg",
+      "gallery": [
+        "images/choc-truffle-loaf.jpg"
+      ],
+      "ingredients": [
+        "dark chocolate",
+        "cocoa",
+        "eggs",
+        "refined flour",
+        "butter",
+        "chocolate ganache"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 box",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "chocolate-crunch-mousse-cake",
+      "name": "Chocolate Crunch Mousse Cake",
+      "category": "pastries",
+      "description": "Chocolate mousse layered with crunchy chocolate flakes and finished with edible gold leaf.",
+      "price": 200,
+      "menuConfirmed": false,
+      "priceNote": "Not on the current printed menu flyer — confirm the real price before publishing.",
+      "image": "images/chocolate-crunch-mousse.jpg",
+      "gallery": [
+        "images/chocolate-crunch-mousse.jpg"
+      ],
+      "ingredients": [
+        "chocolate mousse",
+        "crunchy chocolate flakes",
+        "cocoa",
+        "cream",
+        "edible gold leaf"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 box",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true,
+      "photoConfirmed": true,
+      "photoNote": null
+    },
+    {
+      "productId": "dark-chocolate-cake",
+      "name": "Dark Chocolate Cake",
+      "category": "cakes",
+      "description": "A rich, moist dark chocolate layer cake finished with a glossy chocolate ganache drip and dark chocolate shavings.",
+      "price": 190,
+      "menuConfirmed": false,
+      "priceNote": "Not on the current printed menu flyer — confirm the real name and price with DE.25 before publishing.",
+      "image": "images/dark-chocolate-cake.jpg",
+      "photoConfirmed": true,
+      "photoNote": null,
+      "gallery": [
+        "images/dark-chocolate-cake.jpg"
+      ],
+      "ingredients": [
+        "dark chocolate",
+        "cocoa",
+        "flour",
+        "butter",
+        "sugar",
+        "chocolate ganache"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 box",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true
+    },
+    {
+      "productId": "fruit-cake",
+      "name": "Fruit Cake",
+      "category": "cakes",
+      "description": "A soft vanilla sponge cake layered with fresh cream and topped with strawberries, kiwi, orange and blueberries.",
+      "price": 170,
+      "menuConfirmed": false,
+      "priceNote": "Not on the current printed menu flyer — confirm the real name and price with DE.25 before publishing.",
+      "image": "images/fruit-cake.jpg",
+      "photoConfirmed": true,
+      "photoNote": null,
+      "gallery": [
+        "images/fruit-cake.jpg"
+      ],
+      "ingredients": [
+        "vanilla sponge",
+        "fresh cream",
+        "strawberries",
+        "kiwi",
+        "orange",
+        "blueberries"
+      ],
+      "ingredientsConfirmed": false,
+      "allergens": null,
+      "servingSize": "1 box",
+      "nutrition": {
+        "calories": null,
+        "protein": null,
+        "carbohydrates": null,
+        "fat": null,
+        "sugar": null
+      },
+      "dietaryTags": [],
+      "availability": true,
+      "featured": false,
+      "deliveryAvailable": true
+    }
+  ],
+  "categories": [
+    {
+      "id": "cakes",
+      "label": "Cakes",
+      "description": "Baked cheesecakes and celebration-worthy loaf cakes, made to order."
+    },
+    {
+      "id": "savouries",
+      "label": "Savouries",
+      "description": "Korean buns, loaded nachos and other savoury bites."
+    },
+    {
+      "id": "sips",
+      "label": "Sips",
+      "description": "Hot chocolate and thick milkshakes to go with your order."
+    },
+    {
+      "id": "brownies",
+      "label": "Brownies",
+      "description": "Fudgy, gluten-free and Nutella-topped brownies, sold individually."
+    }
+  ]
+}

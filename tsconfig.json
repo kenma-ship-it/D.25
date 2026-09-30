@@ -1,0 +1,17 @@
+{
+  // Type-checks browser modules that opt in with `// @ts-check` (JSDoc types).
+  // checkJs stays off so imported, unannotated modules aren't checked.
+  // No build step: the site still ships the .js files as-is.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["public/js/cinematicMenu.js", "types/**/*.d.ts"]
+}

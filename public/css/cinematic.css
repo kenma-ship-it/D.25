@@ -1,0 +1,345 @@
+/* Hallmark · component: cinematic menu (film canvas + product card stack)
+ * genre: editorial · theme: design.md (DE.25 locked system — Fraunces / IBM Plex Sans / JetBrains Mono, no accent hue)
+ * states: card default · hover · focus-visible · active · queued (dimmed) · leaving · image-missing
+ * pre-emit critique: P4 H5 E4 S5 R5 V4
+ */
+
+/* ============================================================
+   DE.25 — Cinematic menu (js/cinematicMenu.js)
+   The film fills the screen under the masthead with the whole frame always
+   visible; the card stack (photo, name, price, View more) floats on the
+   right over a soft paper scrim, synced to the same scroll progress.
+   Colours come only from the design tokens in styles.css.
+   ============================================================ */
+
+/* ScrollTrigger measures and restores scroll positions with scrollTo();
+   the site-wide `scroll-behavior: smooth` would animate those jumps and
+   leave the page mid-scroll. */
+html.has-cinematic-menu{ scroll-behavior: auto; }
+
+/* Tall scroll section (height set by JS: SCROLL_LENGTH_VH + 100vh), pulled up
+   under the sticky masthead so the film starts at scroll 0; the stage pads
+   itself clear of the masthead (--cm-header, measured by JS).
+   No overflow:hidden on this or any ancestor — it would break sticky. */
+.cm{
+  --cm-header: 0px;
+  --cm-pad-y: clamp(16px, 2.4vw, 32px);
+  --cm-pad-x: clamp(16px, 3.5vw, 56px);
+  --cm-paper-veil: color-mix(in oklch, var(--warm-white) 28%, transparent);
+  --cm-paper-soft: color-mix(in oklch, var(--warm-white) 72%, transparent);
+  --cm-shadow: color-mix(in oklch, var(--black) 45%, transparent);
+  position: relative;
+  margin-top: calc(-1 * var(--cm-header));
+  background: var(--ivory);
+}
+.cm__fallback{ display: block; width: 100%; height: 100vh; object-fit: contain; background: var(--black); }
+
+.cm__stage{
+  position: sticky; top: 0;
+  height: 100vh; height: 100svh;
+  padding-top: var(--cm-header);
+  box-sizing: border-box;
+}
+/* The stage below the masthead is one layer stack:
+   film (full screen) → soft paper scrim on the right → menu panel. */
+.cm__layout{ position: relative; height: 100%; }
+
+/* ---- The film: full screen, full fit ----
+   The canvas fills the whole stage under the masthead. JS draws the WHOLE
+   frame (never cropped) at full height; any space it doesn't cover takes
+   the frame's own backdrop colours, with the frame's edges faded into it
+   so there is no visible seam (see getFit in js/cinematicMenu.js). */
+.cm__film{
+  position: absolute; inset: 0;
+  overflow: hidden;
+  /* The current frame's own backdrop colours (set by JS per frame), so any
+     space around the fitted frame reads as part of the same studio shot. */
+  /* The colour changes over the frame's own height (JS sets --cm-frame-top/
+     --cm-frame-end), so below a frame that doesn't reach the bottom — phones —
+     the scene continues in exactly the frame's bottom-edge colour. */
+  background: linear-gradient(to bottom,
+    var(--cm-bg-top, var(--cream)) var(--cm-frame-top, 0px),
+    var(--cm-bg-bottom, var(--ivory)) var(--cm-frame-end, 100%));
+}
+/* Positioned and sized by JS (layout()) to exactly the fitted frame; its soft
+   edges are a CSS mask, composited by the GPU. */
+.cm__canvas{ position: absolute; left: 0; top: 0; display: block; }
+
+.cm__loader{
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-xs);
+  background: var(--black); color: var(--warm-white);
+}
+.cm__loader[hidden]{ display: none; }
+.cm__loader-mark{ margin: 0; font-family: var(--font-display); font-size: clamp(34px, 5vw, 56px); font-weight: 500; letter-spacing: 0.04em; }
+.cm__loader-text{ margin: 0; font-size: 11px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cm-paper-soft); font-variant-numeric: tabular-nums; }
+
+.cm__progress{ position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 2px; background: var(--cm-paper-veil); }
+.cm__progress span{ display: block; height: 100%; background: var(--warm-white); transform: scaleX(0); transform-origin: left; }
+
+/* ---- Right: menu panel ----
+   Card geometry is read by JS from these properties (cardPose()), so the
+   stack layout and its animation always agree. */
+.cm__panel{
+  /* Card height follows the screen height so the whole deck always fits
+     (JS measures the rendered card, so any CSS value here is safe). */
+  --cm-card-h: clamp(340px, calc(100svh - var(--cm-header) - 258px), 640px);
+  --cm-depth-y: 12px;       /* how far each card behind peeks above the one in front */
+  --cm-deck-depth: 3;       /* keep equal to DECK_DEPTH in js/cinematicMenu.js */
+  position: absolute; z-index: 2; top: 0; right: 0; bottom: 0;
+  width: clamp(360px, 31vw, 480px);
+}
+/* Soft paper scrim behind the menu so type stays readable over any frame.
+   It reaches further left than the panel and fades out, so the film still
+   reads as full screen. */
+.cm__panel::before{
+  content: ""; position: absolute; z-index: -1; top: 0; bottom: 0; right: 0; left: -32%;
+  background: linear-gradient(to left,
+    color-mix(in oklch, var(--ivory) 92%, transparent) 0%,
+    color-mix(in oklch, var(--ivory) 84%, transparent) 55%,
+    transparent 100%);
+  pointer-events: none;
+}
+.cm__group{
+  position: absolute; inset: var(--cm-pad-y) var(--cm-pad-x) var(--cm-pad-y) 0;
+  display: flex; flex-direction: column; justify-content: center;
+  opacity: 0; will-change: opacity, transform;
+}
+.cm__kicker{ margin: 0 0 var(--space-2xs); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cm__head{ margin-bottom: var(--space-md); }
+.cm__title{ margin: 0; font-family: var(--font-display); font-size: clamp(34px, 3.2vw, 52px); font-weight: 500; line-height: 1; letter-spacing: -0.01em; color: var(--black); }
+
+/* Intro + final (roman only — no italic display type) */
+.cm__brand{ margin: 0; font-family: var(--font-display); font-size: clamp(48px, 5.2vw, 84px); font-weight: 500; line-height: 0.95; letter-spacing: 0.01em; color: var(--black); }
+.cm__sub{ margin: var(--space-2xs) 0 var(--space-lg); font-family: var(--font-display); font-size: 18px; color: var(--ink-soft); }
+.cm__line{ margin: 0; padding-top: var(--space-sm); border-top: 1px solid var(--line); font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); }
+.cm__cue{ display: inline-flex; align-items: center; gap: 10px; margin: var(--space-lg) 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.cm__cue span{ width: 28px; height: 1px; background: currentColor; transform-origin: left; animation: cm-cue 2.2s var(--ease-cinematic) infinite; }
+@keyframes cm-cue{ 0%{ transform: scaleX(0); } 60%, 100%{ transform: scaleX(1); opacity: 0; } }
+.cm__cta{
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 28px;
+  font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--warm-white); background: var(--black); border: 0; border-radius: var(--radius-pill); cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-cinematic);
+}
+.cm__cta:hover{ opacity: 0.82; }
+.cm__cta:active{ transform: translateY(1px); }
+.cm__cta:focus-visible{ outline: 2px solid var(--black); outline-offset: 3px; }
+
+/* ---- Scroll stack deck ----
+   The front card is the active product. The next cards wait stacked BEHIND
+   it — each layer a little smaller and --cm-depth-y higher, so only its top
+   edge shows. As you scroll, the front card peels up and away and the card
+   behind rises forward. JS (cardPose) moves them with transform/opacity only. */
+.cm__deck{
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: var(--space-sm);
+  align-items: start;
+}
+.cm__stack{
+  position: relative;
+  height: calc(var(--cm-card-h) + var(--cm-deck-depth) * var(--cm-depth-y));
+  perspective: 1400px;
+}
+.cm__card{
+  position: absolute; left: 0; right: 0; bottom: 0; height: var(--cm-card-h);
+  transform-origin: 50% 0; will-change: transform, opacity;
+}
+/* Shadow as its own layer: JS fades it with --cm-lift (front card = deepest
+   shadow), which is cheaper than animating box-shadow itself. */
+.cm__card::after{
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 2px; pointer-events: none;
+  box-shadow: 0 30px 50px -30px var(--cm-shadow), 0 6px 14px -10px var(--cm-shadow);
+  opacity: var(--cm-lift, 1);
+}
+/* Text takes only the height it needs; the photo gets all the rest. */
+.cm__card-inner{
+  position: relative; height: 100%; box-sizing: border-box; overflow: hidden;
+  display: grid; grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--warm-white); border: 1px solid var(--line); border-radius: 2px;
+}
+/* Cards behind stay opaque (nothing shows through); only their contents dim. */
+.cm__card-inner > *{ opacity: var(--cm-dim, 1); }
+
+.cm__card-media{ position: relative; min-height: 0; overflow: hidden; }
+/* The WHOLE product photo, never cropped (DE.25's photos come in portrait
+   and landscape shapes), inset on the card's own paper with a small margin.
+   It fills its box but never sizes the card. */
+.cm__card-media img{
+  position: absolute; top: 12px; left: 12px; right: 12px; bottom: 0;
+  display: block; width: calc(100% - 24px); height: calc(100% - 12px); object-fit: contain;
+  transition: transform var(--dur-slow) var(--ease-cinematic);
+}
+.cm__card.is-active:hover .cm__card-media img{ transform: scale(1.04); }
+/* A photo that fails to load leaves a quiet paper block, never a broken-image icon. */
+.cm__card-media.is-missing img{ display: none; }
+
+.cm__card-body{ display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 14px 18px 4px; }
+.cm__card-index{ margin: 0 0 6px; font-family: var(--font-outlier); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cm__card-name{
+  margin: 0; font-family: var(--font-display); font-size: clamp(20px, 1.6vw, 26px); font-weight: 500; line-height: 1.12;
+  color: var(--black); overflow-wrap: anywhere;
+}
+.cm__card-price{ margin: 6px 0 0; font-family: var(--font-outlier); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--black); }
+.cm__card-desc{
+  margin: var(--space-2xs) 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-soft);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cm__more{
+  margin-top: auto; align-self: flex-start; min-height: 44px; padding: 0;
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+  color: var(--black); background: none; border: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px;
+}
+.cm__more span{ transition: transform var(--dur-fast) var(--ease-cinematic); }
+.cm__more:hover span{ transform: translateX(3px); }
+.cm__more:active{ transform: translateY(1px); }
+.cm__more:focus-visible{ outline: 2px solid var(--black); outline-offset: 4px; }
+
+/* ---- Timeline: one dot per product, the line fills to the front card ---- */
+.cm__timeline{
+  position: relative; box-sizing: border-box;
+  height: var(--cm-card-h); margin-top: calc(var(--cm-deck-depth) * var(--cm-depth-y));
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 20px 0;
+}
+.cm__timeline-track{ position: absolute; top: 24px; bottom: 24px; left: 50%; width: 1px; transform: translateX(-50%); background: var(--line); }
+.cm__timeline-fill{ position: absolute; inset: 0; background: var(--black); transform-origin: 50% 0; transform: scaleY(0); }
+.cm__dot{
+  position: relative; z-index: 1; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%;
+  background: var(--ivory); border: 1px solid var(--muted);
+  transition: background var(--dur-fast) var(--ease-cinematic), border-color var(--dur-fast) var(--ease-cinematic), transform var(--dur-base) var(--ease-cinematic);
+}
+.cm__dot.is-done{ background: var(--black); border-color: var(--black); }
+.cm__dot.is-active{ background: var(--black); border-color: var(--black); transform: scale(1.4); }
+/* Pulsing ring on the current product. */
+.cm__dot.is-active::after{
+  content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid var(--black);
+  animation: cm-pulse 1.8s var(--ease-cinematic) infinite;
+}
+@keyframes cm-pulse{ 0%{ transform: scale(0.6); opacity: 0.7; } 100%{ transform: scale(1.9); opacity: 0; } }
+
+/* The Food Guide button stays visible; keep the bottom of the menu clear of it. */
+@media (min-width: 1024px){
+  .cm__group{ bottom: 88px; }
+}
+
+/* ---- Tablet + mobile (< 1024px): PHOTO ON TOP, DARK SHEET BELOW ----
+   The photo spans the full width at the top, zoomed out enough to show the
+   whole product (JS: MOBILE_VISIBLE), and its bottom edge fades into a deep
+   dark sheet that fills the rest of the screen. The menu sits on that sheet
+   in light type — one continuous screen, no flat grey block. Cards are
+   opaque objects with the whole product photo on top. ---- */
+@media (max-width: 1023px){
+  .cm:not(.is-static) .cm__film{ background: var(--black); }
+  .cm:not(.is-static) .cm__panel{
+    /* Starts just inside the photo's soft bottom fade (JS sets --cm-photo-h). */
+    top: calc(var(--cm-photo-h, 56vw) - 48px); bottom: 0; left: 0; width: auto; height: auto;
+    background: none;
+    --cm-card-h: clamp(200px, calc(100svh - var(--cm-header) - var(--cm-photo-h, 56vw) - 110px), 440px);
+    --cm-depth-y: 6px;
+  }
+  .cm:not(.is-static) .cm__panel::before{ display: none; }
+  /* Bottom inset keeps the deck clear of the Food Guide button (≈52px + 16px). */
+  .cm:not(.is-static) .cm__group{ inset: var(--space-sm) var(--space-sm) 72px; justify-content: flex-start; }
+  .cm:not(.is-static) .cm__group--intro, .cm:not(.is-static) .cm__group--final{ justify-content: center; }
+  .cm__stack, .cm__head{ width: 100%; max-width: 620px; margin-inline: auto; }
+  .cm__head{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-xs); }
+  .cm__head .cm__kicker{ order: 2; margin: 0; }
+
+  /* Light type on the dark sheet. */
+  .cm:not(.is-static) .cm__head, .cm:not(.is-static) .cm__group--intro, .cm:not(.is-static) .cm__group--final{ color: var(--warm-white); }
+  .cm:not(.is-static) .cm__title, .cm:not(.is-static) .cm__brand{ color: var(--warm-white); }
+  .cm:not(.is-static) .cm__kicker, .cm:not(.is-static) .cm__sub, .cm:not(.is-static) .cm__line, .cm:not(.is-static) .cm__cue{ color: var(--cm-paper-soft); }
+  .cm:not(.is-static) .cm__line{ border-top-color: color-mix(in oklch, var(--warm-white) 30%, transparent); }
+  .cm__title{ font-size: 28px; }
+  .cm__brand{ font-size: 40px; }
+  .cm__sub{ margin-bottom: var(--space-sm); }
+  .cm__cue{ margin-top: var(--space-sm); }
+  .cm:not(.is-static) .cm__cta{ color: var(--black); background: var(--warm-white); }
+  .cm:not(.is-static) .cm__cta:focus-visible{ outline-color: var(--warm-white); }
+  .cm:not(.is-static) .cm__card::after{ box-shadow: 0 24px 40px -24px color-mix(in oklch, var(--black) 80%, transparent); }
+  /* The black Food Guide button would vanish on the dark sheet: invert it. */
+  html.has-cinematic-menu .ai-fab{ background: var(--warm-white); color: var(--black); }
+
+  /* Card: the whole product photo on top (as large as the card allows),
+     then name, price and View more. The full description is under View more. */
+  .cm__deck{ grid-template-columns: minmax(0, 1fr); }
+  .cm__timeline{ display: none; }
+  .cm__card-media img{ top: 10px; left: 10px; right: 10px; width: calc(100% - 20px); height: calc(100% - 10px); }
+  .cm__card-body{ padding: 8px 14px 0; }
+  .cm__card-index, .cm__card-desc{ display: none; }
+  .cm__card-name{ font-size: 18px; }
+  .cm__card-price{ margin-top: 2px; font-size: 13px; }
+}
+/* ---- Reduced motion (or GSAP unavailable): one still frame beside a
+   plain, fully readable menu list. Nothing is scroll-driven. ---- */
+.cm.is-static .cm__stage{ position: relative; height: auto; }
+.cm.is-static .cm__layout{
+  height: auto; display: grid; align-items: start;
+  grid-template-columns: minmax(0, 60fr) minmax(320px, 34fr); column-gap: clamp(24px, 3.5vw, 64px);
+  padding: var(--cm-pad-y) var(--cm-pad-x);
+}
+.cm.is-static .cm__film{ position: sticky; top: calc(var(--cm-header) + var(--space-md)); inset: auto; aspect-ratio: 16 / 9; }
+.cm.is-static .cm__panel{ position: static; width: auto; background: none; --cm-card-h: 188px; }
+.cm.is-static .cm__panel::before{ display: none; }
+.cm.is-static .cm__group{ position: static; opacity: 1; margin-bottom: var(--space-xl); }
+.cm.is-static .cm__deck{ display: block; }
+.cm.is-static .cm__timeline{ display: none; }
+.cm.is-static .cm__stack{ height: auto; perspective: none; }
+.cm.is-static .cm__card{ position: relative; height: auto; min-height: var(--cm-card-h); margin-bottom: var(--space-2xs); }
+.cm.is-static .cm__card-inner{ grid-template-rows: none; grid-template-columns: 38% minmax(0, 1fr); min-height: var(--cm-card-h); }
+.cm.is-static .cm__card-desc{ -webkit-line-clamp: unset; }
+.cm.is-static .cm__cue{ display: none; }
+@media (max-width: 767px){
+  .cm.is-static .cm__layout{ grid-template-columns: minmax(0, 1fr); row-gap: var(--space-sm); padding: var(--space-sm); }
+  .cm.is-static .cm__film{ position: relative; top: 0; height: auto; }
+  .cm.is-static .cm__group{ inset: auto; }
+}
+@media (prefers-reduced-motion: reduce){
+  .cm__cue span, .cm__dot.is-active::after{ animation: none; }
+  .cm__cue span{ transform: none; }
+  .cm__card-media img, .cm__dot{ transition: none; }
+  .cm__card.is-active:hover .cm__card-media img{ transform: none; }
+}
+
+/* ============================================================
+   Post-film hero (editorial)
+   ============================================================ */
+.hero--editorial{
+  position: relative;
+  min-height: 80vh;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--black);
+  overflow: hidden;
+}
+.hero-content--post-cinematic{ position: relative; text-align: center; max-width: 800px; padding: var(--space-2xl) var(--space-md); }
+.hero-title--editorial{
+  font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 500; line-height: 1.1;
+  color: var(--warm-white); letter-spacing: -0.01em; margin: 0 0 var(--space-md);
+}
+.hero-title--editorial:focus{ outline: none; }
+.hero--editorial .hero-eyebrow{ font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(251,250,247,0.72); margin: 0 0 var(--space-md); }
+.hero--editorial .hero-tagline{ font-size: 1rem; color: rgba(251,250,247,0.72); margin: 0 0 var(--space-xl); }
+.hero--editorial .hero-signature{ font-family: var(--font-display); font-style: italic; font-size: 1rem; color: rgba(251,250,247,0.6); margin-top: var(--space-xl); }
+.hero--editorial .hero-actions{ display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap; }
+
+/* Primary = the one filled shape (design.md CTA voice); ghost = outline. */
+.btn-primary,
+.btn-ghost{
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 32px;
+  font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none;
+  border-radius: var(--radius-pill); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-cinematic), color var(--dur-fast) var(--ease-cinematic), border-color var(--dur-fast) var(--ease-cinematic);
+}
+.btn-primary{ color: var(--black); background: var(--warm-white); border: 1px solid var(--warm-white); }
+.btn-primary:hover{ background: var(--cream); border-color: var(--cream); }
+.btn-ghost{ color: var(--warm-white); background: transparent; border: 1px solid rgba(251,250,247,0.4); }
+.btn-ghost:hover{ border-color: var(--warm-white); }
+.hero--editorial .btn-primary:focus-visible,
+.hero--editorial .btn-ghost:focus-visible{ outline: 2px solid var(--warm-white); outline-offset: 3px; }
+
+@media (max-width: 600px){
+  .hero-content--post-cinematic{ padding: var(--space-xl) var(--space-md); }
+  .hero--editorial .hero-actions{ flex-direction: column; align-items: stretch; }
+}

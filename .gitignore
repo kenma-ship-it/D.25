@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+.DS_Store
+data/custom-enquiries.json
+data/orders.json
+data/notifications.json
+.unlazy/

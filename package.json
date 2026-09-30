@@ -1,0 +1,27 @@
+{
+  "name": "de25-website",
+  "version": "3.3.0",
+  "private": true,
+  "description": "DE.25 by Harshali — production-shaped demo website: full menu, cart, checkout, an owner dashboard with WhatsApp order notifications, and pluggable backends (Google Sheets menu, Supabase Postgres orders, Supabase Auth admin login, Borzo delivery) that all default to a zero-setup demo mode.",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node test/run.cjs",
+    "frames:manifest": "node scripts/build-frame-manifest.cjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

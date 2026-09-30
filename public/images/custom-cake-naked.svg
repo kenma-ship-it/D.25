@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300" role="img" aria-labelledby="ccn-title ccn-desc">
+  <title id="ccn-title">Semi-naked berry cake (illustrated concept)</title>
+  <desc id="ccn-desc">A stylised semi-naked sponge cake with visible layers, a thin cream coat, fresh berries and greenery on top, shown as design inspiration only.</desc>
+  <defs>
+    <linearGradient id="ccn-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8f3ea"/><stop offset="1" stop-color="#ece2ce"/>
+    </linearGradient>
+    <radialGradient id="ccn-shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0d0c0b" stop-opacity="0.22"/><stop offset="0.7" stop-color="#0d0c0b" stop-opacity="0.07"/><stop offset="1" stop-color="#0d0c0b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ccn-sponge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ecc488"/><stop offset="0.5" stop-color="#dfaf6c"/><stop offset="1" stop-color="#cf9955"/>
+    </linearGradient>
+    <linearGradient id="ccn-round" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="0.45" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.3"/>
+    </linearGradient>
+    <clipPath id="ccn-body-clip"><path d="M104 146 a96 20 0 0 0 192 0 v64 a96 20 0 0 1 -192 0z"/></clipPath>
+  </defs>
+  <rect width="400" height="300" fill="url(#ccn-bg)"/>
+  <ellipse cx="200" cy="252" rx="122" ry="15" fill="url(#ccn-shadow)"/>
+  <ellipse cx="200" cy="238" rx="112" ry="18" fill="#ffffff" stroke="#ddd5c6"/>
+  <ellipse cx="200" cy="236" rx="98" ry="13.5" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="1"/>
+
+  <!-- Three visible sponge layers with thin cream between, and a thin cream coat around the outside -->
+  <g>
+    <path d="M104 210 a96 20 0 0 0 192 0 v10 a96 20 0 0 1 -192 0z" fill="url(#ccn-sponge)"/>
+    <ellipse cx="200" cy="210" rx="96" ry="20" fill="#fffaf0" opacity="0.9"/>
+    <path d="M104 178 a96 20 0 0 0 192 0 v10 a96 20 0 0 1 -192 0z" fill="url(#ccn-sponge)"/>
+    <ellipse cx="200" cy="178" rx="96" ry="20" fill="#fffaf0" opacity="0.9"/>
+    <path d="M104 146 a96 20 0 0 0 192 0 v10 a96 20 0 0 1 -192 0z" fill="url(#ccn-sponge)"/>
+    <ellipse cx="200" cy="146" rx="96" ry="20" fill="#fffaf0"/>
+  </g>
+  <!-- Roundness overlay across the full stack for a cohesive, more photographic light wrap -->
+  <rect x="104" y="146" width="192" height="84" fill="url(#ccn-round)" clip-path="url(#ccn-body-clip)" style="mix-blend-mode:overlay"/>
+  <!-- Fine crumb speckling on the exposed sponge faces for texture -->
+  <g fill="#b9793a" opacity="0.25">
+    <circle cx="130" cy="196" r="1.1"/><circle cx="150" cy="202" r="0.9"/><circle cx="175" cy="192" r="1"/>
+    <circle cx="205" cy="200" r="1.1"/><circle cx="230" cy="194" r="0.9"/><circle cx="255" cy="200" r="1"/>
+    <circle cx="140" cy="164" r="1"/><circle cx="180" cy="160" r="0.9"/><circle cx="222" cy="164" r="1"/><circle cx="260" cy="160" r="0.9"/>
+  </g>
+  <!-- Thin translucent cream coat, deliberately not fully covering the sponge (the "naked" look) -->
+  <path d="M104 168 a96 46 0 0 0 192 0" fill="#fffdf8" opacity="0.4"/>
+  <path d="M104 168 a96 46 0 0 0 60 44" fill="#ffffff" opacity="0.2"/>
+
+  <!-- Fresh berries + greenery on top, with a small glossy highlight per berry -->
+  <g>
+    <circle cx="176" cy="140" r="9" fill="#c23b3b"/>
+    <circle cx="192" cy="136" r="9" fill="#c23b3b"/>
+    <circle cx="208" cy="140" r="8" fill="#7a3b52"/>
+    <circle cx="222" cy="136" r="8" fill="#3d4a78"/>
+    <circle cx="234" cy="141" r="7" fill="#3d4a78"/>
+    <path d="M170 132 c6 -10 20 -10 22 -2 c-6 6 -16 6 -22 2z" fill="#5c8a44"/>
+    <path d="M226 130 c5 -8 15 -8 17 -1 c-5 5 -13 5 -17 1z" fill="#6a9c50"/>
+  </g>
+  <g fill="#ffffff" opacity="0.55">
+    <ellipse cx="173" cy="136" rx="2.2" ry="1.6"/><ellipse cx="189" cy="132" rx="2.2" ry="1.6"/>
+    <ellipse cx="205" cy="137" rx="1.8" ry="1.3"/><ellipse cx="219" cy="132" rx="1.8" ry="1.3"/><ellipse cx="231" cy="138" rx="1.6" ry="1.2"/>
+  </g>
+</svg>

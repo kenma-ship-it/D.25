@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DE.25 — Owner Dashboard</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="a11y-announcer" role="status" aria-live="assertive" class="visually-hidden"></div>
+
+<!-- ============ LOGIN GATE ============ -->
+<div id="login-screen" class="login-screen">
+  <main>
+    <!-- Shown when ADMIN_TOKEN is the active auth mode (see /api/admin/auth-config). -->
+    <form id="login-form" class="login-card">
+      <p class="login-brand">DE.25</p>
+      <h1>Owner Dashboard</h1>
+      <p class="login-hint">Enter the admin access token to view live orders.</p>
+      <label class="visually-hidden" for="token-input">Admin access token</label>
+      <input type="password" id="token-input" class="token-input" placeholder="Admin access token" autocomplete="off">
+      <button type="submit" class="unlock-btn">Unlock dashboard</button>
+      <p id="login-error" class="login-error" role="alert" hidden></p>
+    </form>
+
+    <!-- Shown when Supabase Auth is the active auth mode. -->
+    <form id="supabase-login-form" class="login-card" hidden>
+      <p class="login-brand">DE.25</p>
+      <h1>Owner Dashboard</h1>
+      <p class="login-hint">Sign in with your DE.25 admin account.</p>
+      <label class="visually-hidden" for="email-input">Email</label>
+      <input type="email" id="email-input" class="token-input" placeholder="Email" autocomplete="username" required>
+      <label class="visually-hidden" for="password-input">Password</label>
+      <input type="password" id="password-input" class="token-input" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit" class="unlock-btn">Sign in</button>
+      <p id="supabase-login-error" class="login-error" role="alert" hidden></p>
+    </form>
+  </main>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboard" class="dashboard" hidden>
+  <header class="dash-header">
+    <div>
+      <p class="dash-brand">DE.25</p>
+      <h1>Live Orders</h1>
+    </div>
+    <div class="dash-header-actions">
+      <span id="connection-status" class="connection-status">Connecting…</span>
+      <button type="button" id="sound-toggle" class="icon-btn" aria-pressed="true" title="New-order sound">Sound: On</button>
+      <button type="button" id="lock-btn" class="icon-btn">Lock</button>
+    </div>
+  </header>
+
+  <div id="new-order-banner" class="new-order-banner" role="status" hidden></div>
+
+  <main class="dash-main">
+    <section class="orders-panel" aria-label="Orders">
+      <div class="panel-head">
+        <h2>Orders <span id="order-count" class="count-badge">0</span></h2>
+        <p class="panel-note">Newest first · refreshes automatically</p>
+      </div>
+      <div id="orders-list" class="orders-list" aria-live="polite">
+        <p class="empty-note">Loading orders…</p>
+      </div>
+    </section>
+
+    <section class="notifications-panel" aria-label="Recent notifications">
+      <div class="panel-head">
+        <h2>Notifications</h2>
+        <p id="notification-mode" class="panel-note">—</p>
+      </div>
+      <div id="notifications-list" class="notifications-list">
+        <p class="empty-note">Loading…</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
