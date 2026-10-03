@@ -2,8 +2,9 @@ const express = require("express");
 const { validateBody, checkoutSchema } = require("../lib/validation");
 const { priceCart, PricingError } = require("../lib/pricing");
 const { getDeliveryProvider } = require("../delivery");
-const { createOrder, setDeliveryOrderId } = require("../lib/orders");
-const { notifyNewOrder, getVerificationChannel } = require("../notifications");
+const { createOrder, updateOrder } = require("../lib/orders");
+const { getVerificationChannel } = require("../notifications");
+const { startPayment, customerPaymentSummary } = require("../payments/service");
 const { verifyToken } = require("../lib/phoneVerification");
 const { asyncHandler } = require("../lib/asyncHandler");
 
@@ -43,37 +44,26 @@ router.post(
       throw err;
     }
 
-    const order = await createOrder({ customer, address, pricing, paymentMethod });
+    // The order is recorded first (so a payment can always be matched back to
+    // it), but stays AWAITING_PAYMENT: the kitchen, the owner alert, the
+    // customer's receipt and the delivery booking all wait until the payment
+    // gateway confirms the money arrived (server/payments/service.js).
+    const order = await createOrder({ customer: { ...customer, phoneVerified }, address, pricing, paymentMethod });
 
-    // Demo delivery order creation is fire-and-forget and never blocks the
-    // customer's confirmation — a real courier network being briefly slow
-    // or down should never fail an already-priced, already-recorded order.
-    // The in-memory `order` object is mutated immediately so the response
-    // below reflects it, AND persisted back to whichever store is active
-    // (setDeliveryOrderId) — with a database-backed store, mutating the
-    // plain object alone wouldn't survive a reload, so both matter here.
-    provider
-      .createDeliveryOrder({ orderId: order.orderId, address, customer })
-      .then((deliveryOrder) => {
-        order.deliveryOrderId = deliveryOrder.deliveryOrderId;
-        return setDeliveryOrderId(order.orderId, deliveryOrder.deliveryOrderId);
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error("[checkout] delivery order creation failed (order still stands):", err);
-      });
-
-    // Same fire-and-forget principle: the owner alert and the customer's
-    // order slip are side effects of a successful order, not conditions for
-    // one. notifyNewOrder() internally catches every failure itself, so
-    // this can't reject, but it's still not awaited on the response path —
-    // the customer sees their confirmation immediately either way.
-    notifyNewOrder(order, { customerPhoneVerified: phoneVerified });
+    let started;
+    try {
+      started = await startPayment(order);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[checkout] could not start payment:", err.message);
+      await updateOrder(order.orderId, { status: "CANCELLED" }).catch(() => {});
+      return res.status(502).json({ error: "We couldn't connect to the payment service. Nothing was charged — please try again in a minute." });
+    }
 
     res.status(201).json({
       orderId: order.orderId,
       token: order.token,
-      status: order.status,
+      status: started.order.status,
       lines: order.lines,
       subtotal: order.subtotal,
       deliveryFee: order.deliveryFee,
@@ -81,6 +71,8 @@ router.post(
       total: order.total,
       isLiveDelivery: deliveryQuote.isLive,
       deliveryProvider: deliveryQuote.provider,
+      payment: customerPaymentSummary(started.order),
+      checkout: started.checkout,
     });
   })
 );

@@ -4,7 +4,7 @@ const express = require("express");
 const path = require("path");
 
 const { securityHeaders, requireSameOrigin } = require("./middleware/security");
-const { apiLimiter, writeLimiter, aiLimiter } = require("./middleware/rateLimit");
+const { apiLimiter, writeLimiter, aiLimiter, paymentLimiter } = require("./middleware/rateLimit");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { getAdminAuthMode } = require("./lib/adminAuthConfig");
 
@@ -18,6 +18,9 @@ const aiGuideRouter = require("./routes/aiGuide");
 const customRouter = require("./routes/custom");
 const adminRouter = require("./routes/admin");
 const verifyRouter = require("./routes/verify");
+const review = require("./routes/review");
+const payments = require("./routes/payments");
+const { getPaymentProvider } = require("./payments");
 
 function parseTrustProxy(value) {
   if (value === undefined || value === "" || value === "false" || value === "0") return false;
@@ -39,9 +42,23 @@ app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 // explicit connect-src allowance — see server/middleware/security.js.
 const adminAuthMode = getAdminAuthMode();
 const cspConnectSrc = adminAuthMode.mode === "supabase" ? [adminAuthMode.supabaseUrl] : [];
-app.use(securityHeaders(cspConnectSrc));
+// Razorpay Checkout runs in an iframe from Razorpay's own domains — allowed
+// only when Razorpay is the active payment provider.
+const razorpayCsp = getPaymentProvider().name === "razorpay";
+app.use(securityHeaders(cspConnectSrc, { razorpay: razorpayCsp }));
+
+// Payment gateway webhook: needs the raw body for its signature, and must
+// not share the per-IP API rate limit with customers (the gateway sends
+// bursts from a few IPs). Registered before the JSON parser and limiter.
+app.use("/api/payments/webhook", payments.webhookRouter);
+
 app.use(express.json({ limit: "50kb" })); // small, deliberate cap — nothing this app accepts legitimately needs more
 app.use(requireSameOrigin);
+
+// QR review page: /review/ is static (public/review/). "/review.html" is a
+// short form people may type. The QR code + printable card are owner-only
+// (owner dashboard, /api/admin/review-qr.*).
+app.get("/review.html", (_req, res) => res.redirect(302, "/review/"));
 
 // Static frontend. Images/fonts/CSS/JS are all under public/ and served
 // read-only; express.static resolves paths safely (no path traversal via
@@ -62,11 +79,13 @@ app.use("/api/products", productsRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/delivery", writeLimiter, deliveryRouter);
 app.use("/api/checkout", writeLimiter, checkoutRouter);
+app.use("/api/payments", paymentLimiter, payments.router);
 app.use("/api/orders", orderRouter);
 app.use("/api/verify", writeLimiter, verifyRouter);
 app.use("/api/ai-guide", aiLimiter, aiGuideRouter);
 app.use("/api/custom-enquiry", writeLimiter, customRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/review", review.apiRouter);
 
 app.use("/api", notFoundHandler);
 app.use(errorHandler);

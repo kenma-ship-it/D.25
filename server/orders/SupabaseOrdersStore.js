@@ -40,6 +40,7 @@ const STATUSES = [
   "OUT_FOR_DELIVERY",
   "DELIVERED",
 ];
+const PRE_PAYMENT_STATUSES = ["AWAITING_PAYMENT", "CANCELLED"];
 
 const TABLE = "orders";
 
@@ -69,6 +70,7 @@ function toRow(order) {
     delivery_quote: order.deliveryQuote,
     payment_method: order.paymentMethod,
     delivery_order_id: order.deliveryOrderId,
+    payment: order.payment || null,
     status: order.status,
     status_history: order.statusHistory,
     created_at: order.createdAt,
@@ -91,6 +93,7 @@ function fromRow(row) {
     deliveryQuote: row.delivery_quote,
     paymentMethod: row.payment_method,
     deliveryOrderId: row.delivery_order_id,
+    payment: row.payment || null,
     status: row.status,
     statusHistory: row.status_history,
     createdAt: row.created_at,
@@ -110,7 +113,8 @@ class SupabaseOrdersStore extends OrdersStore {
   async createOrder({ customer, address, pricing, paymentMethod, deliveryOrderId }) {
     const orderId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const initialStatus = paymentMethod === "upi" ? "PAYMENT_CONFIRMED" : "ORDER_PLACED";
+    // Nothing is confirmed until the payment gateway says the money arrived.
+    const initialStatus = "AWAITING_PAYMENT";
 
     const order = {
       orderId,
@@ -126,6 +130,7 @@ class SupabaseOrdersStore extends OrdersStore {
       deliveryQuote: pricing.deliveryQuote,
       paymentMethod,
       deliveryOrderId: deliveryOrderId || null,
+      payment: null,
       status: initialStatus,
       statusHistory: [{ status: initialStatus, at: now }],
       createdAt: now,
@@ -136,9 +141,38 @@ class SupabaseOrdersStore extends OrdersStore {
       body: toRow(order),
       prefer: "return=representation",
     });
-    const saved = fromRow(Array.isArray(rows) ? rows[0] : rows) || order;
-    this._scheduleDemoProgression(saved.orderId, saved.status);
-    return saved;
+    return fromRow(Array.isArray(rows) ? rows[0] : rows) || order;
+  }
+
+  async getOrderByGatewayOrderId(gatewayOrderId) {
+    if (!gatewayOrderId) return null;
+    const rows = await restRequest(TABLE, { query: { "payment->>gatewayOrderId": `eq.${gatewayOrderId}`, select: "*", limit: "1" } });
+    return fromRow(Array.isArray(rows) ? rows[0] : null);
+  }
+
+  /** Replaces `payment` and/or moves `status` (appending to status_history) in one PATCH. */
+  async updateOrder(orderId, { payment, status, customer } = {}) {
+    const existing = await this.getOrder(orderId);
+    if (!existing) return null;
+    const body = {};
+    if (payment !== undefined) body.payment = payment;
+    if (customer !== undefined) body.customer = customer;
+    if (status && status !== existing.status && (STATUSES.includes(status) || PRE_PAYMENT_STATUSES.includes(status))) {
+      body.status = status;
+      body.status_history = [...existing.statusHistory, { status, at: new Date().toISOString() }];
+    }
+    if (!Object.keys(body).length) return existing;
+    const rows = await restRequest(TABLE, {
+      method: "PATCH",
+      query: { order_id: `eq.${orderId}` },
+      body,
+      prefer: "return=representation",
+    });
+    return fromRow(Array.isArray(rows) ? rows[0] : null);
+  }
+
+  startDemoProgression(orderId, fromStatus = "PAYMENT_CONFIRMED") {
+    this._scheduleDemoProgression(orderId, fromStatus);
   }
 
   async getOrder(orderId) {
@@ -166,7 +200,7 @@ class SupabaseOrdersStore extends OrdersStore {
   }
 
   async setStatus(orderId, status) {
-    if (!STATUSES.includes(status)) return this.getOrder(orderId);
+    if (!STATUSES.includes(status) && !PRE_PAYMENT_STATUSES.includes(status)) return this.getOrder(orderId);
     const existing = await this.getOrder(orderId);
     if (!existing) return null;
     const statusHistory = [...existing.statusHistory, { status, at: new Date().toISOString() }];
@@ -206,7 +240,9 @@ class SupabaseOrdersStore extends OrdersStore {
    * delivery is actually live).
    */
   _scheduleDemoProgression(orderId, currentStatus) {
-    const remaining = STATUSES.slice(STATUSES.indexOf(currentStatus) + 1);
+    const from = STATUSES.indexOf(currentStatus);
+    if (from === -1) return;
+    const remaining = STATUSES.slice(from + 1);
     let delay = 6000;
     remaining.forEach((status) => {
       const timer = setTimeout(() => {
@@ -225,4 +261,4 @@ class SupabaseOrdersStore extends OrdersStore {
   }
 }
 
-module.exports = { SupabaseOrdersStore, STATUSES };
+module.exports = { SupabaseOrdersStore, STATUSES, PRE_PAYMENT_STATUSES };

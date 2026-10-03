@@ -33,8 +33,10 @@ function ownerMessage(order) {
     `${order.customer.name} - ${order.customer.phone}\n` +
     `${formatLines(order)}\n` +
     `Deliver to: ${addressLine}${addr.landmark ? ` (near ${addr.landmark})` : ""}\n` +
-    // DE.25 takes online payment only (checkoutSchema accepts nothing else).
-    `Payment: Online (UPI)`
+    // Only ever sent once the payment gateway has confirmed the payment
+    // (server/payments/service.js) — DE.25 takes online payment only.
+    `Payment: PAID online${order.payment && order.payment.method ? ` (${String(order.payment.method).toUpperCase()})` : ""}` +
+    `${order.payment && order.payment.paymentId ? ` - Ref ${order.payment.paymentId}` : ""}`
   );
 }
 

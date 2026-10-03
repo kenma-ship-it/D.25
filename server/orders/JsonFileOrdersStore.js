@@ -15,6 +15,9 @@ const { OrdersStore } = require("./OrdersStore");
 
 const ORDERS_PATH = path.join(__dirname, "..", "..", "data", "orders.json");
 
+// Fulfilment steps, in order. An order only enters this sequence once its
+// payment is confirmed; before that it is AWAITING_PAYMENT, and an order
+// whose payment never arrives ends as CANCELLED (server/payments/service.js).
 const STATUSES = [
   "ORDER_PLACED",
   "PAYMENT_CONFIRMED",
@@ -23,6 +26,7 @@ const STATUSES = [
   "OUT_FOR_DELIVERY",
   "DELIVERED",
 ];
+const PRE_PAYMENT_STATUSES = ["AWAITING_PAYMENT", "CANCELLED"];
 
 function generateToken() {
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -82,7 +86,8 @@ class JsonFileOrdersStore extends OrdersStore {
   async createOrder({ customer, address, pricing, paymentMethod, deliveryOrderId }) {
     const orderId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const initialStatus = paymentMethod === "upi" ? "PAYMENT_CONFIRMED" : "ORDER_PLACED";
+    // Nothing is confirmed until the payment gateway says the money arrived.
+    const initialStatus = "AWAITING_PAYMENT";
 
     const order = {
       orderId,
@@ -98,6 +103,7 @@ class JsonFileOrdersStore extends OrdersStore {
       deliveryQuote: pricing.deliveryQuote,
       paymentMethod,
       deliveryOrderId: deliveryOrderId || null,
+      payment: null,
       status: initialStatus,
       statusHistory: [{ status: initialStatus, at: now }],
       createdAt: now,
@@ -105,8 +111,33 @@ class JsonFileOrdersStore extends OrdersStore {
 
     this.orders.set(orderId, order);
     this._persist();
-    this._scheduleDemoProgression(orderId);
     return order;
+  }
+
+  async getOrderByGatewayOrderId(gatewayOrderId) {
+    if (!gatewayOrderId) return null;
+    for (const order of this.orders.values()) {
+      if (order.payment && order.payment.gatewayOrderId === gatewayOrderId) return order;
+    }
+    return null;
+  }
+
+  /** Replaces `payment` and/or moves `status` (appending to statusHistory) in one write. */
+  async updateOrder(orderId, { payment, status, customer } = {}) {
+    const order = this.orders.get(orderId);
+    if (!order) return null;
+    if (payment !== undefined) order.payment = payment;
+    if (customer !== undefined) order.customer = customer;
+    if (status && status !== order.status && (STATUSES.includes(status) || PRE_PAYMENT_STATUSES.includes(status))) {
+      order.status = status;
+      order.statusHistory.push({ status, at: new Date().toISOString() });
+    }
+    this._persist();
+    return order;
+  }
+
+  startDemoProgression(orderId) {
+    if (this.orders.has(orderId)) this._scheduleDemoProgression(orderId);
   }
 
   async getOrder(orderId) {
@@ -129,7 +160,7 @@ class JsonFileOrdersStore extends OrdersStore {
   async setStatus(orderId, status) {
     const order = this.orders.get(orderId);
     if (!order) return null;
-    if (!STATUSES.includes(status)) return order;
+    if (!STATUSES.includes(status) && !PRE_PAYMENT_STATUSES.includes(status)) return order;
     order.status = status;
     order.statusHistory.push({ status, at: new Date().toISOString() });
     this._persist();
@@ -160,11 +191,15 @@ class JsonFileOrdersStore extends OrdersStore {
    * server/orders/index.js) for the full rationale.
    */
   _scheduleDemoProgression(orderId) {
-    const remaining = STATUSES.slice(STATUSES.indexOf(this.orders.get(orderId).status) + 1);
+    const from = STATUSES.indexOf(this.orders.get(orderId).status);
+    if (from === -1) return;
+    const remaining = STATUSES.slice(from + 1);
     let delay = 6000;
     remaining.forEach((status) => {
       const timer = setTimeout(() => {
-        if (this.orders.has(orderId)) this.setStatus(orderId, status);
+        const o = this.orders.get(orderId);
+        // Skip if the owner has already moved it past this step by hand.
+        if (o && STATUSES.indexOf(o.status) > -1 && STATUSES.indexOf(o.status) < STATUSES.indexOf(status)) this.setStatus(orderId, status);
       }, delay);
       // Demo-only timers must never keep the Node process (or a test run)
       // alive on their own — a real deployment stays up because of the
@@ -175,4 +210,4 @@ class JsonFileOrdersStore extends OrdersStore {
   }
 }
 
-module.exports = { JsonFileOrdersStore, STATUSES };
+module.exports = { JsonFileOrdersStore, STATUSES, PRE_PAYMENT_STATUSES };

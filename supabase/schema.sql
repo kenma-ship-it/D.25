@@ -32,6 +32,7 @@ create table if not exists public.orders (
   delivery_quote     jsonb,
   payment_method     text not null,
   delivery_order_id  text,
+  payment            jsonb,
   status             text not null,
   status_history     jsonb not null default '[]'::jsonb,
   created_at         timestamptz not null default now()
@@ -50,3 +51,29 @@ alter table public.orders enable row level security;
 
 comment on table public.orders is
   'DE.25 customer orders. Contains PII (customer/address jsonb). Server-only access via the service_role key — no RLS policies are defined on purpose.';
+
+-- ---------------------------------------------------------------------------
+-- Online payments (added with the payment gateway). Safe to run again on a
+-- project created before this section existed.
+-- ---------------------------------------------------------------------------
+-- order.payment holds the gateway order id, every payment attempt (with
+-- failure reasons), refunds and any issues the owner must act on — see
+-- server/payments/service.js. Orders start as AWAITING_PAYMENT.
+alter table public.orders add column if not exists payment jsonb;
+create index if not exists orders_gateway_order_idx on public.orders ((payment ->> 'gatewayOrderId'));
+create index if not exists orders_status_idx on public.orders (status);
+
+-- Payments the gateway reported that match no order (money taken, nothing
+-- to fulfil — usually refunded). Same server-only access as orders.
+create table if not exists public.payment_issues (
+  payment_id        text primary key,
+  gateway_order_id  text,
+  status            text not null,
+  amount_paise      bigint not null,
+  method            text,
+  source            text,
+  seen_at           timestamptz not null default now(),
+  resolved          boolean not null default false
+);
+alter table public.payment_issues enable row level security;
+-- No policies on purpose, same as public.orders.

@@ -6,7 +6,7 @@
 <title>DE.25 — Owner Dashboard</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/favicon.ico" sizes="any">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -47,10 +47,11 @@
   <header class="dash-header">
     <div>
       <p class="dash-brand">DE.25</p>
-      <h1>Live Orders</h1>
+      <h1>Owner Dashboard</h1>
     </div>
     <div class="dash-header-actions">
       <span id="connection-status" class="connection-status">Connecting…</span>
+      <button type="button" id="qr-toggle" class="icon-btn" aria-expanded="false" aria-controls="qr-panel">Review QR</button>
       <button type="button" id="sound-toggle" class="icon-btn" aria-pressed="true" title="New-order sound">Sound: On</button>
       <button type="button" id="lock-btn" class="icon-btn">Lock</button>
     </div>
@@ -58,18 +59,88 @@
 
   <div id="new-order-banner" class="new-order-banner" role="status" hidden></div>
 
+  <!-- Printable review QR card — owner only. The QR opens the public review page (/review). -->
+  <section id="qr-panel" class="qr-panel" aria-label="Review QR card" hidden>
+    <div class="qr-tools">
+      <h2>Review QR card</h2>
+      <p class="panel-note">Print on A6 card (or A4 at 50% for 4 per page) and keep it on the counter. Customers scan it to rate DE.25 on Google.</p>
+      <div class="qr-tool-btns">
+        <button type="button" class="qr-btn" id="qr-print">Print card</button>
+        <button type="button" class="qr-btn qr-btn-ghost" id="qr-download">Download QR as PNG</button>
+      </div>
+      <p class="panel-note" id="qr-warn" hidden></p>
+    </div>
+    <article class="qr-card" aria-label="Review QR card preview">
+      <p class="qr-brand">DE.25</p>
+      <p class="qr-kicker">Cakes &middot; Savouries &middot; Sips</p>
+      <p class="qr-headline">Loved your treat?</p>
+      <p class="qr-ask">Scan to rate us on Google — it takes 30 seconds.</p>
+      <img class="qr-code" id="qr-img" alt="QR code linking to the DE.25 review page" width="240" height="240">
+      <p class="qr-url" id="qr-url"></p>
+      <p class="qr-thanks">Thank you for supporting a small dessert shop &middot; Ghansoli</p>
+    </article>
+  </section>
+
+  <nav class="dash-tabs" role="tablist" aria-label="Dashboard sections">
+    <button type="button" role="tab" id="tab-orders" aria-controls="panel-orders" aria-selected="true" data-tab="orders">Orders <span class="tab-badge" id="tab-orders-badge" hidden></span></button>
+    <button type="button" role="tab" id="tab-revenue" aria-controls="panel-revenue" aria-selected="false" tabindex="-1" data-tab="revenue">Revenue</button>
+    <button type="button" role="tab" id="tab-notifications" aria-controls="panel-notifications" aria-selected="false" tabindex="-1" data-tab="notifications">Notifications</button>
+  </nav>
+
   <main class="dash-main">
-    <section class="orders-panel" aria-label="Orders">
+    <section class="orders-panel" id="panel-orders" role="tabpanel" aria-labelledby="tab-orders">
+      <!-- Payments the gateway reported that match no order — money taken, nothing to fulfil. -->
+      <div id="unmatched-panel" class="unmatched-panel" hidden>
+        <h2>Payments with no matching order</h2>
+        <p class="panel-note">Money was received but no order matches it. Find it in the payment gateway dashboard and refund it (or contact the customer), then mark it handled.</p>
+        <div id="unmatched-list"></div>
+      </div>
       <div class="panel-head">
         <h2>Orders <span id="order-count" class="count-badge">0</span></h2>
-        <p class="panel-note">Newest first · refreshes automatically</p>
+        <p class="panel-note">Newest first · refreshes automatically · <span id="payment-mode">—</span></p>
+      </div>
+      <div class="order-filters" role="group" aria-label="Filter orders">
+        <button type="button" data-filter="all" aria-pressed="true">All <span class="filter-count">0</span></button>
+        <button type="button" data-filter="paid" aria-pressed="false">Paid <span class="filter-count">0</span></button>
+        <button type="button" data-filter="awaiting" aria-pressed="false">Awaiting payment <span class="filter-count">0</span></button>
+        <button type="button" data-filter="failed" aria-pressed="false">Failed / cancelled <span class="filter-count">0</span></button>
+        <button type="button" data-filter="attention" aria-pressed="false">Needs attention <span class="filter-count">0</span></button>
       </div>
       <div id="orders-list" class="orders-list" aria-live="polite">
         <p class="empty-note">Loading orders…</p>
       </div>
     </section>
 
-    <section class="notifications-panel" aria-label="Recent notifications">
+    <!-- ============ REVENUE ============ -->
+    <section class="revenue-panel" id="panel-revenue" role="tabpanel" aria-labelledby="tab-revenue" hidden>
+      <div class="panel-head">
+        <h2>Revenue</h2>
+        <p class="panel-note" id="revenue-basis">Paid orders only, after refunds · India time</p>
+      </div>
+      <div class="rev-tiles" id="rev-tiles"></div>
+      <div class="rev-chart-card">
+        <div class="rev-chart-head">
+          <h3 id="rev-chart-title">Daily revenue — last 30 days</h3>
+          <div class="rev-range" role="group" aria-label="Period">
+            <button type="button" data-range="daily" aria-pressed="true">Daily</button>
+            <button type="button" data-range="monthly" aria-pressed="false">Monthly</button>
+            <button type="button" data-range="yearly" aria-pressed="false">Yearly</button>
+          </div>
+        </div>
+        <div class="rev-chart" id="rev-chart"></div>
+        <details class="rev-table-wrap">
+          <summary>Show as table</summary>
+          <table class="rev-table" id="rev-table"></table>
+        </details>
+      </div>
+      <div class="rev-top">
+        <div><h3>Top sellers this month</h3><ol id="rev-top-month"></ol></div>
+        <div><h3>Top sellers this year</h3><ol id="rev-top-year"></ol></div>
+      </div>
+    </section>
+
+    <!-- ============ NOTIFICATIONS ============ -->
+    <section class="notifications-panel" id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications" hidden>
       <div class="panel-head">
         <h2>Notifications</h2>
         <p id="notification-mode" class="panel-note">—</p>

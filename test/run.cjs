@@ -135,10 +135,11 @@ test("order store round-trips create/get/advance through the active store", asyn
     },
     paymentMethod: "upi",
   });
-  assert.equal(order.status, "PAYMENT_CONFIRMED");
+  assert.equal(order.status, "AWAITING_PAYMENT", "nothing is confirmed before the payment gateway says so");
 
   const fetched = await ordersFactory.getOrder(order.orderId);
   assert.equal(fetched.orderId, order.orderId);
+  await ordersFactory.updateOrder(order.orderId, { status: "PAYMENT_CONFIRMED" });
 
   const { STATUSES } = require("../server/orders/JsonFileOrdersStore");
   const advanced = await ordersFactory.advanceStatus(order.orderId);
@@ -386,8 +387,12 @@ test("otp http: My Orders and checkout both require the WhatsApp code; receipts 
     const placed = await call("POST", "/api/checkout", order(P1, token));
     assert.equal(placed.status, 201);
     assert.equal(placed.body.pin, undefined, "order PIN must not be exposed");
+    assert.equal(placed.body.status, "AWAITING_PAYMENT");
     await new Promise((r) => setTimeout(r, 150));
-    assert.equal(slipsFor(placed.body.orderId).length, 1, "verified customer gets their receipt");
+    assert.equal(slipsFor(placed.body.orderId).length, 0, "no receipt before payment");
+    assert.equal((await call("POST", `/api/payments/${placed.body.orderId}/demo`, { outcome: "success" })).body.order.payment.status, "PAID");
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(slipsFor(placed.body.orderId).length, 1, "verified customer gets their receipt once paid");
 
     // Production with no WhatsApp account: codes can't be sent (and must never be echoed back);
     // ordering still works, but no customer receipt is sent to the unverified number.
@@ -395,10 +400,430 @@ test("otp http: My Orders and checkout both require the WhatsApp code; receipts 
     assert.equal((await call("POST", "/api/verify/phone/request", { phone: P2 })).status, 503);
     const prodOrder = await call("POST", "/api/checkout", order(P2));
     assert.equal(prodOrder.status, 201);
+    await call("POST", `/api/payments/${prodOrder.body.orderId}/demo`, { outcome: "success" });
     await new Promise((r) => setTimeout(r, 150));
     assert.equal(slipsFor(prodOrder.body.orderId).length, 0, "unverified number must not get a receipt");
   } finally {
     if (prevEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = prevEnv;
     server.close();
   }
+});
+
+// --- QR review page: suggestion engine + API ---
+const rv = require("../server/lib/reviewSuggest");
+
+test("review built-in: matches the stars and only names the items picked", () => {
+  const five = rv.builtInSuggest({ rating: 5, itemNames: ["Blueberry Cheesecake"], tagLabels: { positive: ["Taste"], issues: [] }, seed: 3 });
+  assert.match(five, /Blueberry Cheesecake/);
+  assert.match(five, /taste/i);
+  for (let seed = 1; seed <= 30; seed++) {
+    const one = rv.builtInSuggest({ rating: 1, itemNames: ["Korean Bun"], tagLabels: { positive: [], issues: ["Late delivery"] }, seed });
+    assert.doesNotMatch(one, /loved|highly recommend|must-try|gem|delicious/i, "a 1-star draft must not read positive");
+    assert.doesNotMatch(one, /Cheesecake|Tiramisu|Brownie/, "must not invent items");
+    assert.doesNotMatch(rv.builtInSuggest({ rating: 4, itemNames: ["A", "B"], tagLabels: { positive: [], issues: [] }, seed }), /they was|it were/);
+  }
+});
+
+test("review grok: sends a Responses API request and reads text past a reasoning item", async () => {
+  process.env.XAI_API_KEY = "test-key";
+  let captured;
+  const fakeFetch = async (url, opts) => {
+    captured = { url, opts, body: JSON.parse(opts.body) };
+    return { ok: true, json: async () => ({ output: [{ type: "reasoning", summary: [] }, { type: "message", content: [{ type: "output_text", text: '"Loved the Tiramisu at DE.25, super fresh! #dessert ★★★★★"' }] }] }) };
+  };
+  try {
+    const out = await rv.suggestReview({ rating: 5, itemNames: ["Tiramisu"], tagLabels: { positive: ["Freshness"], issues: [] }, seed: 1 }, { fetchImpl: fakeFetch });
+    assert.equal(out.engine, "grok");
+    assert.equal(out.text, "Loved the Tiramisu at DE.25, super fresh!");
+    assert.match(captured.url, /\/v1\/responses$/);
+    assert.equal(captured.opts.headers.Authorization, "Bearer test-key");
+    assert.ok(captured.body.model);
+    assert.match(captured.body.input[0].content, /never sound more positive than the rating/);
+    assert.match(captured.body.input[1].content, /Star rating: 5 out of 5[\s\S]*Tiramisu/);
+  } finally {
+    delete process.env.XAI_API_KEY;
+  }
+});
+
+test("review grok: any failure falls back to the built-in writer", async () => {
+  process.env.XAI_API_KEY = "test-key";
+  try {
+    const failing = [
+      async () => { throw new Error("network down"); },
+      async () => ({ ok: false, status: 401, text: async () => "bad key" }),
+      async () => ({ ok: true, json: async () => ({ output: [] }) }),
+    ];
+    for (const f of failing) {
+      const out = await rv.suggestReview({ rating: 4, itemNames: ["Korean Bun"], tagLabels: { positive: [], issues: [] }, seed: 2 }, { fetchImpl: f });
+      assert.equal(out.engine, "built-in");
+      assert.match(out.text, /Korean Bun/);
+    }
+  } finally {
+    delete process.env.XAI_API_KEY;
+  }
+});
+
+test("review google link: Place ID builds the write-review link; non-Google URLs are ignored", () => {
+  const keep = { u: process.env.GOOGLE_REVIEW_URL, p: process.env.GOOGLE_PLACE_ID };
+  try {
+    delete process.env.GOOGLE_REVIEW_URL;
+    delete process.env.GOOGLE_PLACE_ID;
+    assert.equal(rv.getGoogleReviewUrl().configured, false);
+    process.env.GOOGLE_PLACE_ID = "ChIJN1t_tDeuEmsRUsoyG83frY4";
+    assert.equal(rv.getGoogleReviewUrl().url, "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4");
+    process.env.GOOGLE_REVIEW_URL = "https://evil.example.com/phish";
+    assert.match(rv.getGoogleReviewUrl().url, /^https:\/\/search\.google\.com\//, "a non-Google link must be ignored");
+    process.env.GOOGLE_REVIEW_URL = "https://g.page/r/CabcDEF123/review";
+    assert.equal(rv.getGoogleReviewUrl().url, "https://g.page/r/CabcDEF123/review");
+  } finally {
+    if (keep.u === undefined) delete process.env.GOOGLE_REVIEW_URL; else process.env.GOOGLE_REVIEW_URL = keep.u;
+    if (keep.p === undefined) delete process.env.GOOGLE_PLACE_ID; else process.env.GOOGLE_PLACE_ID = keep.p;
+  }
+});
+
+test("review http: validates input, ignores tags that don't fit the rating, serves menu, short link; QR card is owner-only", async () => {
+  const { app } = require("../server/index.js");
+  await require("../server/products").initProducts();
+  delete process.env.XAI_API_KEY; // never call the real Grok API from tests
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = async (body) => {
+    const r = await fetch(`${base}/api/review/suggest`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return { status: r.status, body: await r.json() };
+  };
+  process.env.PUBLIC_SITE_URL = "https://de25.example.in";
+  try {
+    const menu = await (await fetch(`${base}/api/review/menu`)).json();
+    assert.deepEqual(menu.categories.map((c) => c.id), ["cakes", "pastries", "savouries", "sips"]);
+    assert.ok(menu.items.some((i) => i.id === "korean-bun" && i.category === "savouries"));
+    assert.equal((await post({ items: ["korean-bun"] })).status, 400, "rating required");
+    assert.equal((await post({ rating: 6, items: ["korean-bun"] })).status, 400);
+    assert.equal((await post({ rating: 5, items: ["not-a-real-item"] })).status, 400, "made-up items rejected");
+    const low = await post({ rating: 1, items: ["korean-bun"], tags: ["taste", "late-delivery"] });
+    assert.equal(low.status, 200);
+    assert.match(low.body.text, /Korean Bun/);
+    assert.doesNotMatch(low.body.text, /taste/i, "praise tags are not offered at 1 star");
+    assert.match(low.body.text, /late delivery/i);
+    const cfg = await (await fetch(`${base}/api/review/config`)).json();
+    assert.equal(cfg.reviewPageUrl, "https://de25.example.in/review/");
+    // The printable QR card is owner-only: nothing public, QR needs the admin login.
+    assert.equal((await fetch(`${base}/review/card.html`)).status, 404);
+    assert.equal((await fetch(`${base}/review/qr.svg`)).status, 404);
+    const keepAdmin = process.env.ADMIN_TOKEN;
+    process.env.ADMIN_TOKEN = "test-admin-token";
+    try {
+      assert.equal((await fetch(`${base}/api/admin/review-qr.svg`)).status, 401);
+      assert.equal((await fetch(`${base}/api/admin/review-qr.png`, { headers: { Authorization: "Bearer wrong" } })).status, 401);
+      const svg = await fetch(`${base}/api/admin/review-qr.svg`, { headers: { Authorization: "Bearer test-admin-token" } });
+      assert.equal(svg.status, 200);
+      assert.match(svg.headers.get("content-type"), /image\/svg\+xml/);
+      const info = await (await fetch(`${base}/api/admin/review-qr.json`, { headers: { Authorization: "Bearer test-admin-token" } })).json();
+      assert.equal(info.reviewPageUrl, "https://de25.example.in/review/");
+    } finally {
+      if (keepAdmin === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = keepAdmin;
+    }
+    const page = await fetch(`${base}/review/`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /How was your DE\.25 treat\?/);
+    const short = await fetch(`${base}/review.html`, { redirect: "manual" });
+    assert.equal(short.status, 302);
+    const bad = await fetch(`${base}/api/review/suggest`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{bad" });
+    assert.deepEqual(await bad.json(), { error: "Invalid request body." });
+  } finally {
+    delete process.env.PUBLIC_SITE_URL;
+    server.close();
+  }
+});
+
+
+// --- Online payments: every way a payment can go wrong (server/payments/service.js) ---
+const { RazorpayPaymentProvider, hmacHex } = require("../server/payments/RazorpayPaymentProvider");
+const paymentsFactory = require("../server/payments");
+const paySvc = require("../server/payments/service");
+// These tests place more orders than one IP may in a minute — reset the limiters between them.
+const resetLimits = () => {
+  const limits = require("../server/middleware/rateLimit");
+  for (const key of ["127.0.0.1", "::ffff:127.0.0.1", "::1"]) for (const l of [limits.writeLimiter, limits.apiLimiter, limits.paymentLimiter]) l.resetKey(key);
+};
+
+test("razorpay: checkout and webhook signatures are verified, tampering is rejected", () => {
+  const rz = new RazorpayPaymentProvider({ keyId: "rzp_test_x", keySecret: "key-secret", webhookSecret: "hook-secret" });
+  const sig = hmacHex("key-secret", "order_A|pay_B");
+  assert.equal(rz.verifyCheckoutSignature({ gatewayOrderId: "order_A", paymentId: "pay_B", signature: sig }), true);
+  assert.equal(rz.verifyCheckoutSignature({ gatewayOrderId: "order_A", paymentId: "pay_OTHER", signature: sig }), false);
+  assert.equal(rz.verifyCheckoutSignature({ gatewayOrderId: "order_A", paymentId: "pay_B", signature: "" }), false);
+  const body = JSON.stringify({ event: "payment.captured" });
+  assert.equal(rz.verifyWebhook(body, hmacHex("hook-secret", body)), true);
+  assert.equal(rz.verifyWebhook(body + " ", hmacHex("hook-secret", body)), false);
+  assert.equal(new RazorpayPaymentProvider({ keyId: "a", keySecret: "b" }).verifyWebhook(body, hmacHex("", body)), false, "no webhook secret = reject all");
+});
+
+test("payments http: failed, paid-after-close, duplicate, wrong amount, expired, late, unmatched and refunded payments", async () => {
+  const fs = require("fs");
+  const path = require("path");
+  const { app } = require("../server/index.js");
+  await require("../server/products").initProducts();
+  const notificationsPath = path.join(__dirname, "..", "data", "notifications.json");
+  const { UNMATCHED_FILE } = require("../server/payments/unmatchedStore");
+  const unmatchedBefore = fs.existsSync(UNMATCHED_FILE) ? fs.readFileSync(UNMATCHED_FILE, "utf8") : null;
+
+  // A fake Razorpay: just enough of its API for orders, payments and reconcile.
+  const rzState = { orders: {}, payments: {}, n: 0 };
+  const fakeFetch = async (url, opts = {}) => {
+    const u = new URL(url);
+    const reply = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
+    if (opts.method === "POST" && u.pathname === "/v1/orders") {
+      const body = JSON.parse(opts.body);
+      const id = `order_T${++rzState.n}`;
+      rzState.orders[id] = { id, amount: body.amount, notes: body.notes };
+      return reply({ id, amount: body.amount, currency: "INR" });
+    }
+    let m = u.pathname.match(/^\/v1\/orders\/([^/]+)\/payments$/);
+    if (m) return reply({ items: Object.values(rzState.payments).filter((p) => p.order_id === m[1]) });
+    m = u.pathname.match(/^\/v1\/payments\/([^/]+)$/);
+    if (m) return rzState.payments[m[1]] ? reply(rzState.payments[m[1]]) : reply({ error: { description: "not found" } }, 404);
+    return reply({ error: { description: "unexpected" } }, 400);
+  };
+  const rz = new RazorpayPaymentProvider({ keyId: "rzp_test_key", keySecret: "key-secret", webhookSecret: "hook-secret", fetchImpl: fakeFetch });
+  paymentsFactory._setPaymentProvider(rz);
+
+  const pay = (id, orderId, amount, status = "captured", extra = {}) =>
+    (rzState.payments[id] = { id, order_id: orderId, amount, status, method: "upi", vpa: "cust@okbank", created_at: Math.floor(Date.now() / 1000), ...extra });
+
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, url, body, headers = {}) => {
+    const res = await fetch(base + url, { method, headers: { "Content-Type": "application/json", ...headers }, body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body) });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const webhook = (event, entity, extra = {}) => {
+    const raw = JSON.stringify({ event, payload: { payment: { entity }, ...extra } });
+    return call("POST", "/api/payments/webhook", raw, { "X-Razorpay-Signature": hmacHex("hook-secret", raw) });
+  };
+  const keepAdmin = process.env.ADMIN_TOKEN;
+  process.env.ADMIN_TOKEN = "pay-test-admin";
+  const admin = { Authorization: "Bearer pay-test-admin" };
+  const slips = (orderId) => {
+    try { return JSON.parse(fs.readFileSync(notificationsPath, "utf8")).filter((n) => n.orderId === orderId && n.type === "customer_order_slip").length; }
+    catch { return 0; }
+  };
+  const product = getAllProducts().find((p) => !p.variants && p.availability !== false);
+  let phoneN = 9700000000;
+  const placeOrder = async () => {
+    resetLimits();
+    const phone = String(++phoneN);
+    const token = pv.confirmCode(phone, pv.issueCode(phone).code).token;
+    const r = await call("POST", "/api/checkout", {
+      customer: { name: "Pay Test", phone },
+      address: { house: "1", street: "Main Road", area: "Sector 5", city: "Navi Mumbai", pincode: "400701" },
+      items: [{ productId: product.productId, qty: 1 }],
+      paymentMethod: "upi",
+      phoneVerificationToken: token,
+    });
+    assert.equal(r.status, 201);
+    return r.body;
+  };
+  const getAdminOrder = async (id) => (await call("GET", `/api/admin/orders/${id}`, undefined, admin)).body.order;
+
+  try {
+    // 1. Checkout: order saved but NOT confirmed; the browser gets only public payment params.
+    const o1 = await placeOrder();
+    assert.equal(o1.status, "AWAITING_PAYMENT");
+    assert.equal(o1.checkout.provider, "razorpay");
+    assert.equal(o1.checkout.keyId, "rzp_test_key");
+    assert.equal(JSON.stringify(o1).includes("key-secret"), false, "the key secret never reaches the browser");
+    const gw1 = o1.checkout.gatewayOrderId;
+    const amount = o1.checkout.amountPaise;
+    assert.equal(amount, Math.round(o1.total * 100));
+
+    // 2. Failed attempt: recorded with the bank's reason; still unpaid; kitchen can't start it; no receipt.
+    pay("pay_fail1", gw1, amount, "failed", { error_code: "BAD_REQUEST_ERROR", error_description: "Payment declined by bank" });
+    assert.equal((await webhook("payment.failed", rzState.payments.pay_fail1)).status, 200);
+    let a1 = await getAdminOrder(o1.orderId);
+    assert.equal(a1.status, "AWAITING_PAYMENT");
+    assert.equal(a1.payment.status, "FAILED");
+    assert.equal(a1.payment.attempts[0].errorReason, "Payment declined by bank");
+    assert.equal((await call("PUT", `/api/admin/orders/${o1.orderId}/advance`, undefined, admin)).status, 409, "can't prepare an unpaid order");
+    const cust = (await call("GET", `/api/orders/${o1.orderId}`)).body;
+    assert.equal(cust.payment.canPay, true);
+    assert.equal(cust.payment.lastFailureReason, "Payment declined by bank");
+    assert.equal(slips(o1.orderId), 0);
+
+    // 3. A forged "success" from the browser is rejected.
+    pay("pay_ok1", gw1, amount);
+    const forged = await call("POST", `/api/payments/${o1.orderId}/verify`, { razorpay_order_id: gw1, razorpay_payment_id: "pay_ok1", razorpay_signature: "f".repeat(64) });
+    assert.equal(forged.status, 400);
+    assert.equal((await getAdminOrder(o1.orderId)).payment.status, "FAILED");
+
+    // 4. Genuine success: signature checked + payment fetched from the gateway -> PAID, confirmed, receipt sent once.
+    const ok = await call("POST", `/api/payments/${o1.orderId}/verify`, { razorpay_order_id: gw1, razorpay_payment_id: "pay_ok1", razorpay_signature: hmacHex("key-secret", `${gw1}|pay_ok1`) });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.order.status, "PAYMENT_CONFIRMED");
+    assert.equal(ok.body.order.payment.paymentId, "pay_ok1");
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(slips(o1.orderId), 1);
+
+    // 5. The same payment arriving again by webhook changes nothing (no 2nd receipt, no false duplicate).
+    await webhook("payment.captured", rzState.payments.pay_ok1);
+    await new Promise((r) => setTimeout(r, 150));
+    a1 = await getAdminOrder(o1.orderId);
+    assert.equal(slips(o1.orderId), 1);
+    assert.equal(a1.payment.issues.length, 0);
+    assert.equal(a1.payment.vpa, "cust@okbank");
+
+    // 6. Charged twice -> flagged for refund; the refund webhook then clears it.
+    pay("pay_dup1", gw1, amount);
+    await webhook("payment.captured", rzState.payments.pay_dup1);
+    a1 = await getAdminOrder(o1.orderId);
+    assert.deepEqual(a1.payment.issues.map((i) => [i.code, i.paymentId]), [["DUPLICATE_PAYMENT", "pay_dup1"]]);
+    await webhook("refund.processed", rzState.payments.pay_dup1, { refund: { entity: { id: "rfnd_1", payment_id: "pay_dup1", amount, created_at: 1 } } });
+    a1 = await getAdminOrder(o1.orderId);
+    assert.equal(a1.payment.issues[0].resolved, true);
+    assert.equal(a1.payment.status, "PAID", "refunding the extra charge leaves the order paid");
+
+    // 7. Paid, but the customer closed the page before we heard back (and no webhook): "Check payment" finds it.
+    const o2 = await placeOrder();
+    pay("pay_closed", o2.checkout.gatewayOrderId, amount);
+    const rec = await call("POST", `/api/admin/orders/${o2.orderId}/reconcile`, undefined, admin);
+    assert.equal(rec.status, 200);
+    assert.equal(rec.body.order.status, "PAYMENT_CONFIRMED");
+    assert.equal(rec.body.order.payment.attempts[0].source, "owner-check");
+
+    // 8. Wrong amount -> NOT confirmed, flagged.
+    const o3 = await placeOrder();
+    pay("pay_short", o3.checkout.gatewayOrderId, amount - 100);
+    await webhook("payment.captured", rzState.payments.pay_short);
+    const a3 = await getAdminOrder(o3.orderId);
+    assert.equal(a3.status, "AWAITING_PAYMENT");
+    assert.equal(a3.payment.issues[0].code, "AMOUNT_MISMATCH");
+
+    // 9. Never paid -> cancelled after the payment window; paying later reopens it and flags it.
+    const o4 = await placeOrder();
+    const [expired] = await paySvc.sweep([await getAdminOrder(o4.orderId)], { now: Date.now() + 31 * 60 * 1000 });
+    assert.equal(expired.status, "CANCELLED");
+    assert.equal(expired.payment.status, "EXPIRED");
+    assert.equal((await call("POST", `/api/payments/${o4.orderId}/start`, {})).status, 409, "can't pay an expired order from the site");
+    pay("pay_late", o4.checkout.gatewayOrderId, amount);
+    await webhook("payment.captured", rzState.payments.pay_late);
+    const a4 = await getAdminOrder(o4.orderId);
+    assert.equal(a4.status, "PAYMENT_CONFIRMED");
+    assert.equal(a4.payment.issues[0].code, "PAID_AFTER_EXPIRY");
+    const resolved = await call("POST", `/api/admin/orders/${o4.orderId}/issues/resolve`, { code: "PAID_AFTER_EXPIRY", paymentId: "pay_late" }, admin);
+    assert.equal(resolved.body.order.payment.issues[0].resolved, true);
+
+    // 10. Authorised but not captured -> flagged, not confirmed.
+    const o5 = await placeOrder();
+    pay("pay_auth", o5.checkout.gatewayOrderId, amount, "authorized");
+    await webhook("payment.authorized", rzState.payments.pay_auth);
+    const a5 = await getAdminOrder(o5.orderId);
+    assert.equal(a5.status, "AWAITING_PAYMENT");
+    assert.equal(a5.payment.status, "AUTHORIZED");
+    assert.equal(a5.payment.issues[0].code, "AUTHORIZED_NOT_CAPTURED");
+
+    // 11. Payment for an order we don't know -> listed for the owner.
+    pay("pay_orphan", "order_UNKNOWN", 49900);
+    await webhook("payment.captured", rzState.payments.pay_orphan);
+    const issues = (await call("GET", "/api/admin/payment-issues", undefined, admin)).body.unmatched;
+    assert.ok(issues.some((u) => u.paymentId === "pay_orphan" && u.amountPaise === 49900));
+    assert.equal((await call("POST", "/api/admin/payment-issues/pay_orphan/resolve", undefined, admin)).status, 200);
+
+    // 12. Full refund of the real payment -> REFUNDED.
+    await webhook("refund.processed", rzState.payments.pay_closed, { refund: { entity: { id: "rfnd_2", payment_id: "pay_closed", amount, created_at: 1 } } });
+    assert.equal((await getAdminOrder(o2.orderId)).payment.status, "REFUNDED");
+
+    // 13. Webhooks without a valid signature are ignored.
+    const raw = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: rzState.payments.pay_short } } });
+    assert.equal((await call("POST", "/api/payments/webhook", raw, { "X-Razorpay-Signature": "bad" })).status, 400);
+
+    // Admin list exposes the payment mode.
+    const list = (await call("GET", "/api/admin/orders?limit=5", undefined, admin)).body;
+    assert.deepEqual(list.payments, { provider: "razorpay", isLive: true });
+  } finally {
+    paymentsFactory._resetPaymentProvider();
+    if (keepAdmin === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = keepAdmin;
+    if (unmatchedBefore === null) fs.rmSync(UNMATCHED_FILE, { force: true }); else fs.writeFileSync(UNMATCHED_FILE, unmatchedBefore);
+    server.close();
+  }
+});
+
+test("payments demo: failure then success on the same order; demo endpoint is off when a real gateway is active", async () => {
+  const { app } = require("../server/index.js");
+  await require("../server/products").initProducts();
+  paymentsFactory._resetPaymentProvider();
+  const server = app.listen(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (method, url, body) => {
+    const res = await fetch(base + url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  try {
+    resetLimits();
+    const phone = "9600000001";
+    const token = pv.confirmCode(phone, pv.issueCode(phone).code).token;
+    const product = getAllProducts().find((p) => !p.variants && p.availability !== false);
+    const placed = (await call("POST", "/api/checkout", {
+      customer: { name: "Demo Pay", phone },
+      address: { house: "1", street: "Main Road", area: "Sector 5", city: "Navi Mumbai", pincode: "400701" },
+      items: [{ productId: product.productId, qty: 1 }],
+      paymentMethod: "upi",
+      phoneVerificationToken: token,
+    })).body;
+    assert.equal(placed.checkout.provider, "demo");
+    const failed = await call("POST", `/api/payments/${placed.orderId}/demo`, { outcome: "failure" });
+    assert.equal(failed.body.order.payment.status, "FAILED");
+    assert.equal(failed.body.order.status, "AWAITING_PAYMENT");
+    const retry = await call("POST", `/api/payments/${placed.orderId}/start`, {});
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.checkout.gatewayOrderId, placed.checkout.gatewayOrderId);
+    const paid = await call("POST", `/api/payments/${placed.orderId}/demo`, { outcome: "success" });
+    assert.equal(paid.body.order.status, "PAYMENT_CONFIRMED");
+    const again = await call("POST", `/api/payments/${placed.orderId}/demo`, { outcome: "success" });
+    assert.equal(again.body.order.payment.paymentId, paid.body.order.payment.paymentId, "double tap doesn't charge twice");
+
+    paymentsFactory._setPaymentProvider(new RazorpayPaymentProvider({ keyId: "k", keySecret: "s" }));
+    assert.equal((await call("POST", `/api/payments/${placed.orderId}/demo`, { outcome: "success" })).status, 404, "no demo payments with a real gateway");
+  } finally {
+    paymentsFactory._resetPaymentProvider();
+    server.close();
+  }
+});
+
+// --- Owner dashboard revenue (server/lib/revenue.js) ---
+test("revenue: counts only confirmed payments, net of refunds, by India day/month/year; demo excluded once live", () => {
+  const { computeRevenue } = require("../server/lib/revenue");
+  const now = new Date("2026-10-01T10:00:00+05:30");
+  const paid = (paidAt, rupees, extra = {}) => ({
+    orderId: Math.random().toString(36),
+    status: "PAYMENT_CONFIRMED",
+    total: rupees,
+    createdAt: paidAt,
+    lines: [{ name: "Tiramisu", qty: 1, lineTotal: rupees }],
+    payment: { provider: "razorpay", status: "PAID", paymentId: "pay_x", amountPaise: rupees * 100, amountPaidPaise: rupees * 100, paidAt, refunds: [], ...extra },
+  });
+  const orders = [
+    paid("2026-10-01T00:10:00+05:30", 300), // today in India (still Sept 30 in UTC)
+    paid("2026-09-30T23:50:00+05:30", 200), // yesterday
+    paid("2026-09-15T12:00:00+05:30", 500, { status: "PARTIALLY_REFUNDED", refunds: [{ paymentId: "pay_x", amountPaise: 10000, status: "processed" }, { paymentId: "pay_dup", amountPaise: 50000, status: "processed" }] }),
+    paid("2025-12-31T20:00:00+05:30", 1000), // last year
+    paid("2026-10-01T09:00:00+05:30", 999, { status: "FAILED" }), // never paid
+    paid("2026-10-01T09:00:00+05:30", 999, { status: "EXPIRED" }),
+    paid("2026-10-01T09:00:00+05:30", 777, { provider: "demo" }), // demo test order
+  ];
+  const r = computeRevenue(orders, { now, liveProvider: "razorpay" });
+  assert.equal(r.today, "2026-10-01");
+  assert.deepEqual([r.summary.today.revenuePaise, r.summary.today.orders], [30000, 1]);
+  assert.equal(r.summary.yesterday.revenuePaise, 20000);
+  assert.equal(r.summary.thisMonth.revenuePaise, 30000);
+  assert.equal(r.summary.lastMonth.revenuePaise, 20000 + 40000, "refund of the order's own payment is subtracted; a duplicate charge's refund is not");
+  assert.equal(r.summary.lastMonth.refundsPaise, 10000);
+  assert.equal(r.summary.thisYear.revenuePaise, 30000 + 20000 + 40000);
+  assert.equal(r.summary.lastYear.revenuePaise, 100000);
+  assert.equal(r.daily.length, 30);
+  assert.equal(r.daily[29].key, "2026-10-01");
+  assert.equal(r.monthly.length, 12);
+  assert.deepEqual([r.monthly[0].key, r.monthly[11].key], ["2025-11", "2026-10"]);
+  assert.deepEqual(r.yearly.map((y) => y.key), ["2025", "2026"]);
+  assert.equal(r.topItems.thisYear[0].name, "Tiramisu");
+  // While still on demo payments, demo orders do count (so the owner can see the dashboard working).
+  assert.equal(computeRevenue(orders, { now }).summary.today.revenuePaise, 30000 + 77700);
 });

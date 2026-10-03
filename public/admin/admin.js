@@ -14,8 +14,34 @@ const STATUS_LABELS = {
   DELIVERED: "Delivered",
 };
 const STATUS_ORDER = Object.keys(STATUS_LABELS);
+const PRE_PAYMENT_LABELS = { AWAITING_PAYMENT: "Awaiting payment", CANCELLED: "Cancelled — not paid" };
 
-let seenOrderIds = null; // null = "haven't loaded once yet" (don't alert on first load)
+// order.payment.status -> [label, css tone] (see server/payments/service.js)
+const PAYMENT_LABELS = {
+  PENDING: ["Awaiting payment", "wait"],
+  FAILED: ["Payment failed", "bad"],
+  AUTHORIZED: ["Authorised — not captured", "bad"],
+  PAID: ["Paid", "ok"],
+  EXPIRED: ["Not paid — cancelled", "off"],
+  PARTIALLY_REFUNDED: ["Partly refunded", "wait"],
+  REFUNDED: ["Refunded", "off"],
+};
+const ISSUE_TITLES = {
+  PAID_AFTER_EXPIRY: "Paid after the order expired",
+  DUPLICATE_PAYMENT: "Charged twice",
+  AMOUNT_MISMATCH: "Amount doesn't match",
+  AUTHORIZED_NOT_CAPTURED: "Payment not captured",
+  REFUND_FAILED: "Refund failed",
+  GATEWAY_ORDER_MISMATCH: "Payment under another gateway order",
+};
+const ATTEMPT_LABELS = { paid: "Paid", failed: "Failed", authorized: "Authorised", pending: "Pending", refunded: "Refunded" };
+const SOURCE_LABELS = { checkout: "customer's checkout", webhook: "gateway webhook", reconcile: "auto check", "owner-check": "your check", "expiry-check": "expiry check", client: "customer's browser" };
+
+let orderFilter = "all";
+let lastOrders = [];
+let paymentsInfo = { provider: "demo", isLive: false };
+
+let seenOrderIds = null; // null = "haven't loaded once yet" (don't alert on first load) — holds ids of orders seen as PAID
 let pollTimer = null;
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
 
@@ -182,11 +208,87 @@ function deliveryNote(order) {
     : "Demo delivery estimate — DE.25 is handling delivery directly for now.";
 }
 
+const rupees = (paise) => formatCurrency((Number(paise) || 0) / 100);
+const isPaid = (order) => !order.payment || ["PAID", "PARTIALLY_REFUNDED"].includes(order.payment.status);
+const openIssues = (order) => ((order.payment && order.payment.issues) || []).filter((i) => !i.resolved);
+
+function when(iso) {
+  return iso ? new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—";
+}
+
+function paymentBlockMarkup(order) {
+  const p = order.payment;
+  if (!p) return `<div class="pay-block"><span class="pay-badge tone-off">Placed before online payments</span></div>`;
+  const [label, tone] = PAYMENT_LABELS[p.status] || [p.status, "wait"];
+  const methodBits = [p.method && p.method.toUpperCase(), p.vpa, p.bank, p.wallet].filter(Boolean).join(" · ");
+  const rows = [
+    ["Amount", `${rupees(p.amountPaise)}${p.amountPaidPaise && p.amountPaidPaise !== p.amountPaise ? ` (paid ${rupees(p.amountPaidPaise)})` : ""}`],
+    p.paymentId ? ["Payment ID", `<code>${escapeHtml(p.paymentId)}</code>`] : null,
+    methodBits ? ["Method", escapeHtml(methodBits)] : null,
+    p.paidAt ? ["Paid at", escapeHtml(when(p.paidAt))] : null,
+    !p.paidAt && order.status === "AWAITING_PAYMENT" ? ["Pay by", escapeHtml(when(p.expiresAt))] : null,
+    ["Gateway order", `<code>${escapeHtml(p.gatewayOrderId || "—")}</code>${p.provider === "demo" ? ' <span class="pay-demo">demo</span>' : ""}`],
+    p.lastCheckedAt ? ["Last checked", escapeHtml(timeAgo(p.lastCheckedAt))] : null,
+  ].filter(Boolean);
+
+  const issues = openIssues(order)
+    .map(
+      (i) => `<div class="pay-issue">
+        <strong>${escapeHtml(ISSUE_TITLES[i.code] || i.code)}</strong>${i.paymentId ? ` <code>${escapeHtml(i.paymentId)}</code>` : ""}${i.amountPaise ? ` · ${rupees(i.amountPaise)}` : ""}
+        <p>${escapeHtml(i.message)}</p>
+        <button type="button" class="pay-link" data-resolve="${escapeHtml(i.code)}" data-payment="${escapeHtml(i.paymentId || "")}">Mark as handled</button>
+      </div>`
+    )
+    .join("");
+
+  const refunds = (p.refunds || [])
+    .map((r) => `<li>Refund ${rupees(r.amountPaise)} · ${escapeHtml(r.status)} · <code>${escapeHtml(r.refundId)}</code> · ${escapeHtml(when(r.at))}</li>`)
+    .join("");
+  const attempts = (p.attempts || [])
+    .slice()
+    .reverse()
+    .map(
+      (a) => `<li class="att-${escapeHtml(a.status)}">
+        <span class="att-status">${escapeHtml(ATTEMPT_LABELS[a.status] || a.status)}</span>
+        ${rupees(a.amountPaise)}${a.method ? ` · ${escapeHtml(a.method.toUpperCase())}` : ""} · ${escapeHtml(when(a.at))}
+        ${a.errorReason ? `<div class="att-reason">${escapeHtml(a.errorReason)}${a.errorCode ? ` (${escapeHtml(a.errorCode)})` : ""}</div>` : ""}
+        <div class="att-ref"><code>${escapeHtml(a.paymentId)}</code> · via ${escapeHtml(SOURCE_LABELS[a.source] || a.source)}</div>
+      </li>`
+    )
+    .join("");
+  const nAttempts = (p.attempts || []).length;
+  const canCheck = paymentsInfo.isLive && p.provider === paymentsInfo.provider;
+
+  return `<div class="pay-block tone-${tone}">
+      <div class="pay-head">
+        <span class="pay-badge tone-${tone}">${escapeHtml(label)}</span>
+        ${canCheck ? `<button type="button" class="pay-link" data-reconcile>Check payment</button>` : ""}
+      </div>
+      <dl class="pay-meta">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+      ${issues}
+      ${
+        nAttempts || refunds
+          ? `<details class="pay-attempts"><summary>${nAttempts} payment attempt${nAttempts === 1 ? "" : "s"}${refunds ? " · refunds" : ""}</summary><ol>${attempts}${refunds}</ol></details>`
+          : `<p class="pay-none">No payment attempt yet.</p>`
+      }
+    </div>`;
+}
+
 function orderCardMarkup(order, isNew) {
   const addr = order.address;
   const addressLine = [addr.house, addr.street, addr.area, addr.city, addr.pincode].filter(Boolean).join(", ");
   const currentIndex = STATUS_ORDER.indexOf(order.status);
   const isFinal = currentIndex === STATUS_ORDER.length - 1;
+  const paid = isPaid(order);
+  const advanceLabel = !paid
+    ? order.status === "CANCELLED"
+      ? "Cancelled"
+      : "Waiting for payment"
+    : isFinal
+      ? "Delivered"
+      : `Mark as ${escapeHtml(STATUS_LABELS[STATUS_ORDER[currentIndex + 1]] || "next step")}`;
+  const statusText = STATUS_LABELS[order.status] || PRE_PAYMENT_LABELS[order.status] || order.status;
+  const needsAttention = openIssues(order).length > 0;
   const lines = order.lines
     .map(
       (l) =>
@@ -195,11 +297,11 @@ function orderCardMarkup(order, isNew) {
     .join("");
 
   return `
-    <article class="order-card${isNew ? " is-new" : ""}" data-order-id="${escapeHtml(order.orderId)}">
+    <article class="order-card${isNew ? " is-new" : ""}${needsAttention ? " needs-attention" : ""}${paid ? "" : " is-unpaid"}" data-order-id="${escapeHtml(order.orderId)}">
       <div class="order-card-top">
         <div>
-          <div class="order-token">${escapeHtml(order.token)}</div>
-          <span class="status-pill st-${escapeHtml(order.status)}">${escapeHtml(STATUS_LABELS[order.status] || order.status)}</span>
+          <div class="order-token">${escapeHtml(order.token)} <span class="order-token-name">&middot; ${escapeHtml(order.customer.name)}</span></div>
+          <span class="status-pill st-${escapeHtml(order.status)}">${escapeHtml(statusText)}</span>
         </div>
         <div style="text-align:right;">
           <div class="order-total">${formatCurrency(order.total)}</div>
@@ -207,24 +309,49 @@ function orderCardMarkup(order, isNew) {
         </div>
       </div>
       <div class="order-customer">
-        <strong>${escapeHtml(order.customer.name)} &middot; <a href="tel:${escapeHtml(order.customer.phone)}">${escapeHtml(order.customer.phone)}</a></strong>
+        <strong><a href="tel:${escapeHtml(order.customer.phone)}">${escapeHtml(order.customer.phone)}</a></strong>
         <div class="order-address">${escapeHtml(addressLine)}${addr.landmark ? ` (near ${escapeHtml(addr.landmark)})` : ""}</div>
       </div>
       <div class="order-lines">${lines}</div>
+      ${paymentBlockMarkup(order)}
       <div class="order-foot">
-        <span class="payment-tag">${order.paymentMethod === "upi" ? "Online · UPI" : "Online payment"}</span>
-        <button type="button" class="advance-btn" data-advance ${isFinal ? "disabled" : ""}>
-          ${isFinal ? "Delivered" : `Mark as ${escapeHtml(STATUS_LABELS[STATUS_ORDER[currentIndex + 1]] || "next step")}`}
-        </button>
+        <span class="payment-tag">Online payment only</span>
+        <button type="button" class="advance-btn" data-advance ${isFinal || !paid ? "disabled" : ""}>${advanceLabel}</button>
       </div>
       <p class="delivery-note">${escapeHtml(deliveryNote(order))}</p>
     </article>
   `;
 }
 
-function renderOrders(orders) {
+const FILTERS = {
+  all: () => true,
+  paid: (o) => isPaid(o) && o.status !== "CANCELLED",
+  awaiting: (o) => o.status === "AWAITING_PAYMENT",
+  failed: (o) => o.status === "CANCELLED" || (o.payment && ["FAILED", "EXPIRED", "REFUNDED"].includes(o.payment.status)),
+  attention: (o) => openIssues(o).length > 0,
+};
+
+function renderFilters(orders) {
+  const attention = orders.filter(FILTERS.attention).length;
+  const badge = qs("#tab-orders-badge");
+  badge.hidden = !attention;
+  badge.textContent = String(attention);
+  badge.setAttribute("aria-label", `${attention} need attention`);
+  qsa("[data-filter]").forEach((btn) => {
+    const key = btn.dataset.filter;
+    const n = orders.filter(FILTERS[key]).length;
+    btn.querySelector(".filter-count").textContent = String(n);
+    btn.setAttribute("aria-pressed", String(orderFilter === key));
+    if (key === "attention") btn.classList.toggle("has-items", n > 0);
+  });
+}
+
+function renderOrders(allOrders) {
+  lastOrders = allOrders;
+  renderFilters(allOrders);
+  const orders = allOrders.filter(FILTERS[orderFilter]);
   const list = qs("#orders-list");
-  qs("#order-count").textContent = String(orders.length);
+  qs("#order-count").textContent = String(allOrders.length);
 
   // seenOrderIds must be initialized on every first call regardless of
   // whether there happen to be zero orders yet — otherwise a store with no
@@ -233,15 +360,71 @@ function renderOrders(orders) {
   const isFirstLoad = seenOrderIds === null;
   if (isFirstLoad) seenOrderIds = new Set();
 
+  // "New order" = newly PAID (an unpaid order isn't something to cook yet).
+  const paidNow = allOrders.filter((o) => isPaid(o) && o.status !== "CANCELLED");
+  const newOnes = paidNow.filter((o) => !seenOrderIds.has(o.orderId));
+  paidNow.forEach((o) => seenOrderIds.add(o.orderId));
+
+  if (!isFirstLoad && newOnes.length > 0) {
+    playChime();
+    const banner = qs("#new-order-banner");
+    const summary =
+      newOnes.length === 1
+        ? `New order: ${newOnes[0].token} — ${newOnes[0].customer.name} — ${formatCurrency(newOnes[0].total)}`
+        : `${newOnes.length} new orders just came in!`;
+    banner.textContent = summary;
+    banner.hidden = false;
+    announce(summary);
+    setTimeout(() => {
+      banner.hidden = true;
+    }, 8000);
+  }
+
   if (orders.length === 0) {
-    list.innerHTML = `<p class="empty-note">No orders yet.</p>`;
+    list.innerHTML = `<p class="empty-note">${allOrders.length ? "No orders in this view." : "No orders yet."}</p>`;
     return;
   }
 
-  const newOnes = orders.filter((o) => !seenOrderIds.has(o.orderId));
-  orders.forEach((o) => seenOrderIds.add(o.orderId));
-
+  // Keep any "payment attempts" lists the owner opened open across refreshes.
+  const openAttempts = new Set(qsa(".pay-attempts[open]", list).map((d) => d.closest(".order-card").dataset.orderId));
   list.innerHTML = orders.map((o) => orderCardMarkup(o, !isFirstLoad && newOnes.some((n) => n.orderId === o.orderId))).join("");
+  qsa(".order-card", list).forEach((card) => {
+    const details = card.querySelector(".pay-attempts");
+    if (details && openAttempts.has(card.dataset.orderId)) details.open = true;
+  });
+
+  qsa("[data-reconcile]", list).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const orderId = btn.closest(".order-card").dataset.orderId;
+      btn.disabled = true;
+      btn.textContent = "Checking…";
+      try {
+        const res = await adminFetch(`/api/admin/orders/${orderId}/reconcile`, { method: "POST" });
+        if (res.status === 401) return handleAuthFailure();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) announce(data.error || "Couldn't check the payment.");
+      } finally {
+        fetchOrders();
+      }
+    });
+  });
+
+  qsa("[data-resolve]", list).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const orderId = btn.closest(".order-card").dataset.orderId;
+      btn.disabled = true;
+      try {
+        const res = await adminFetch(`/api/admin/orders/${orderId}/issues/resolve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: btn.dataset.resolve, paymentId: btn.dataset.payment || undefined }),
+        });
+        if (res.status === 401) return handleAuthFailure();
+      } finally {
+        fetchOrders();
+      }
+    });
+  });
 
   qsa("[data-advance]", list).forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -261,20 +444,6 @@ function renderOrders(orders) {
     });
   });
 
-  if (!isFirstLoad && newOnes.length > 0) {
-    playChime();
-    const banner = qs("#new-order-banner");
-    const summary =
-      newOnes.length === 1
-        ? `New order: ${newOnes[0].token} — ${newOnes[0].customer.name} — ${formatCurrency(newOnes[0].total)}`
-        : `${newOnes.length} new orders just came in!`;
-    banner.textContent = summary;
-    banner.hidden = false;
-    announce(summary);
-    setTimeout(() => {
-      banner.hidden = true;
-    }, 8000);
-  }
 }
 
 function renderNotifications(activeProvider, entries) {
@@ -311,6 +480,12 @@ async function fetchOrders() {
     if (!res.ok) throw new Error("bad status");
     const data = await res.json();
     qs("#connection-status").textContent = "Live";
+    if (data.payments) {
+      paymentsInfo = data.payments;
+      qs("#payment-mode").innerHTML = paymentsInfo.isLive
+        ? `<span class="mode-live">Live</span> — payments via ${escapeHtml(paymentsInfo.provider)}`
+        : `<span class="mode-demo">Demo payments</span> — no real money yet`;
+    }
     renderOrders(data.orders);
   } catch (_e) {
     qs("#connection-status").textContent = "Reconnecting…";
@@ -328,10 +503,46 @@ async function fetchNotifications() {
   }
 }
 
+async function fetchUnmatchedPayments() {
+  try {
+    const res = await adminFetch("/api/admin/payment-issues");
+    if (!res.ok) return;
+    const { unmatched } = await res.json();
+    const panel = qs("#unmatched-panel");
+    panel.hidden = !unmatched.length;
+    qs("#unmatched-list").innerHTML = unmatched
+      .map(
+        (u) => `<div class="unmatched-row">
+          <div><strong>${rupees(u.amountPaise)}</strong> · ${escapeHtml((u.method || "").toUpperCase() || "payment")} · ${escapeHtml(u.status)} · ${escapeHtml(when(u.seenAt))}</div>
+          <div class="att-ref">Payment <code>${escapeHtml(u.paymentId)}</code>${u.gatewayOrderId ? ` · gateway order <code>${escapeHtml(u.gatewayOrderId)}</code>` : ""}</div>
+          <button type="button" class="pay-link" data-unmatched="${escapeHtml(u.paymentId)}">Mark as handled</button>
+        </div>`
+      )
+      .join("");
+    qsa("[data-unmatched]").forEach((btn) =>
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        await adminFetch(`/api/admin/payment-issues/${encodeURIComponent(btn.dataset.unmatched)}/resolve`, { method: "POST" }).catch(() => {});
+        fetchUnmatchedPayments();
+      })
+    );
+  } catch (_e) {
+    /* non-critical */
+  }
+}
+
 function poll() {
   fetchOrders();
   fetchNotifications();
+  fetchUnmatchedPayments();
 }
+
+qsa("[data-filter]").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    orderFilter = btn.dataset.filter;
+    renderOrders(lastOrders);
+  })
+);
 
 function startPolling() {
   stopPolling();
@@ -371,6 +582,7 @@ function showDashboard() {
   qs("#dashboard").hidden = false;
   seenOrderIds = null;
   startPolling();
+  if (activeTab === "revenue") fetchRevenue();
 }
 
 function handleAuthFailure() {
@@ -478,6 +690,65 @@ qs("#supabase-login-form").addEventListener("submit", (e) => {
 
 qs("#lock-btn").addEventListener("click", doLock);
 
+// ---------------------------------------------------------------------
+// Review QR card — the QR opens the public review page (/review); the
+// card itself is owner-only, fetched with the admin credential.
+// ---------------------------------------------------------------------
+let qrObjectUrl = null;
+async function loadReviewQr() {
+  const warn = qs("#qr-warn");
+  warn.hidden = true;
+  const [infoRes, svgRes] = await Promise.all([adminFetch("/api/admin/review-qr.json"), adminFetch("/api/admin/review-qr.svg")]).catch(() => [null, null]);
+  if (!infoRes || !svgRes || !infoRes.ok || !svgRes.ok) {
+    if ((infoRes && infoRes.status === 401) || (svgRes && svgRes.status === 401)) return handleAuthFailure();
+    warn.textContent = "Couldn't load the QR code. Please try again.";
+    warn.hidden = false;
+    return;
+  }
+  const { reviewPageUrl } = await infoRes.json();
+  if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+  qrObjectUrl = URL.createObjectURL(await svgRes.blob());
+  qs("#qr-img").src = qrObjectUrl;
+  qs("#qr-url").textContent = reviewPageUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  if (/^https?:\/\/(localhost|127\.|\[::1\])/.test(reviewPageUrl)) {
+    warn.textContent = "This QR points at localhost, which phones can't open. Set PUBLIC_SITE_URL to your real domain before printing.";
+    warn.hidden = false;
+  }
+}
+qs("#qr-toggle").addEventListener("click", () => {
+  const panel = qs("#qr-panel");
+  panel.hidden = !panel.hidden;
+  qs("#qr-toggle").setAttribute("aria-expanded", String(!panel.hidden));
+  if (!panel.hidden) loadReviewQr();
+});
+qs("#qr-print").addEventListener("click", () => {
+  document.body.classList.add("printing-qr");
+  window.print();
+});
+window.addEventListener("afterprint", () => document.body.classList.remove("printing-qr"));
+qs("#qr-download").addEventListener("click", async () => {
+  const btn = qs("#qr-download");
+  btn.disabled = true;
+  try {
+    const res = await adminFetch("/api/admin/review-qr.png");
+    if (res.status === 401) return handleAuthFailure();
+    if (!res.ok) throw new Error("bad status");
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "de25-review-qr.png";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (_e) {
+    qs("#qr-warn").textContent = "Couldn't download the QR code. Please try again.";
+    qs("#qr-warn").hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 function syncSoundButton() {
   const btn = qs("#sound-toggle");
   btn.setAttribute("aria-pressed", String(soundOn));
@@ -516,3 +787,210 @@ qs("#sound-toggle").addEventListener("click", () => {
     }
   }
 })();
+
+
+// ---------------------------------------------------------------------
+// Tabs: Orders / Revenue / Notifications (orders keep polling on every
+// tab so new-order alerts still sound).
+// ---------------------------------------------------------------------
+const TAB_KEY = "de25_admin_tab";
+let activeTab = "orders";
+let revenueData = null;
+let revenueRange = "daily";
+let revenueTimer = null;
+
+function selectTab(name, { focus = false } = {}) {
+  activeTab = name;
+  qsa("[data-tab]").forEach((btn) => {
+    const on = btn.dataset.tab === name;
+    btn.setAttribute("aria-selected", String(on));
+    btn.tabIndex = on ? 0 : -1;
+    if (on && focus) btn.focus();
+    qs(`#${btn.getAttribute("aria-controls")}`).hidden = !on;
+  });
+  try {
+    localStorage.setItem(TAB_KEY, name);
+  } catch (_e) {
+    /* per-viewer convenience only */
+  }
+  if (revenueTimer) clearInterval(revenueTimer);
+  revenueTimer = null;
+  if (name === "revenue") {
+    fetchRevenue();
+    revenueTimer = setInterval(fetchRevenue, 60000);
+  }
+}
+qsa("[data-tab]").forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
+qs(".dash-tabs").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  const tabs = qsa("[data-tab]");
+  const i = tabs.findIndex((t) => t.dataset.tab === activeTab);
+  const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+  selectTab(next.dataset.tab, { focus: true });
+});
+try {
+  const saved = localStorage.getItem(TAB_KEY);
+  if (saved && qs(`[data-tab="${saved}"]`)) selectTab(saved);
+} catch (_e) {
+  /* default tab */
+}
+
+// ---------------------------------------------------------------------
+// Revenue
+// ---------------------------------------------------------------------
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const inr = (paise) => formatCurrency(Math.round((Number(paise) || 0) / 100));
+function compactInr(paise) {
+  const r = (Number(paise) || 0) / 100;
+  const short = (n, digits) => n.toFixed(digits).replace(/\.0$/, "");
+  if (r >= 1e7) return `₹${short(r / 1e7, r >= 1e8 ? 0 : 1)}Cr`;
+  if (r >= 1e5) return `₹${short(r / 1e5, r >= 1e6 ? 0 : 1)}L`;
+  if (r >= 1e3) return `₹${short(r / 1e3, r >= 1e4 ? 0 : 1)}k`;
+  return `₹${Math.round(r)}`;
+}
+function bucketLabel(range, key, { long = false } = {}) {
+  if (range === "yearly") return key;
+  if (range === "monthly") {
+    const [y, m] = key.split("-");
+    return long ? `${MONTHS[Number(m) - 1]} ${y}` : `${MONTHS[Number(m) - 1]}${m === "01" ? ` '${y.slice(2)}` : ""}`;
+  }
+  const [y, m, d] = key.split("-");
+  return long ? `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}` : `${Number(d)} ${MONTHS[Number(m) - 1]}`;
+}
+/** Axis scale: 4 even steps of a round rupee amount (₹1/2/5 × 10ⁿ) covering the max. */
+function niceScale(maxPaise) {
+  const raw = Math.max(maxPaise / 100, 1000) / 4; // empty chart still gets a ₹0–1k axis
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const stepRupees = [1, 2, 5, 10].find((s) => s * mag >= raw) * mag;
+  const steps = Math.ceil(maxPaise / 100 / stepRupees) || 4;
+  return { stepPaise: stepRupees * 100, steps: Math.max(steps, 1) };
+}
+function delta(cur, prev, label) {
+  if (!prev.revenuePaise) return cur.revenuePaise ? `No sales ${label} to compare` : `No sales ${label} either`;
+  const pct = Math.round(((cur.revenuePaise - prev.revenuePaise) / prev.revenuePaise) * 100);
+  return `${pct >= 0 ? "▲" : "▼"} ${Math.abs(pct)}% vs ${label} (${inr(prev.revenuePaise)})`;
+}
+
+function renderRevenueTiles(d) {
+  const s = d.summary;
+  const tile = (label, b, prev, prevLabel, fullPrev) => `
+    <div class="rev-tile">
+      <p class="rev-tile-label">${label}</p>
+      <p class="rev-tile-value">${inr(b.revenuePaise)}</p>
+      <p class="rev-tile-meta">${b.orders} paid order${b.orders === 1 ? "" : "s"}${b.orders ? ` · avg ${inr(b.revenuePaise / b.orders)}` : ""}${b.refundsPaise ? ` · ${inr(b.refundsPaise)} refunded` : ""}</p>
+      <p class="rev-delta">${escapeHtml(delta(b, prev, prevLabel))}</p>
+      ${fullPrev ? `<p class="rev-tile-meta">${escapeHtml(fullPrev[0])}: ${inr(fullPrev[1].revenuePaise)}</p>` : ""}
+    </div>`;
+  qs("#rev-tiles").innerHTML =
+    tile("Today", s.today, s.yesterday, "yesterday") +
+    tile("This month", s.thisMonth, s.lastMonthToDate, "same days last month", ["Last month total", s.lastMonth]) +
+    tile("This year", s.thisYear, s.lastYearToDate, "same point last year", ["Last year total", s.lastYear]);
+}
+
+function renderRevenueChart() {
+  const d = revenueData;
+  const series = d[revenueRange];
+  const titles = { daily: "Daily revenue — last 30 days", monthly: "Monthly revenue — last 12 months", yearly: "Yearly revenue" };
+  qs("#rev-chart-title").textContent = titles[revenueRange];
+  qsa("[data-range]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.range === revenueRange)));
+
+  const { stepPaise, steps } = niceScale(Math.max(...series.map((x) => x.revenuePaise), 0));
+  const max = stepPaise * steps;
+  const ticks = Array.from({ length: steps + 1 }, (_, i) => i / steps);
+  // Selective x labels (always including the latest), as many as fit — ~60px each.
+  const fit = Math.max(3, Math.floor((qs("#rev-chart").clientWidth - 52) / 60));
+  const every = Math.max(1, Math.ceil(series.length / fit));
+  const labelled = (i) => (series.length - 1 - i) % every === 0;
+  const allZero = series.every((x) => !x.revenuePaise);
+
+  qs("#rev-chart").innerHTML = `
+    <div class="rev-yaxis" aria-hidden="true">${ticks.map((t) => `<span style="bottom:${t * 100}%">${compactInr(max * t)}</span>`).join("")}</div>
+    <div class="rev-plot">
+      ${ticks.slice(1).map((t) => `<div class="rev-grid" style="bottom:${t * 100}%"></div>`).join("")}
+      <div class="rev-bars">${series
+        .map(
+          (x, i) => `<button type="button" class="rev-col" data-i="${i}" aria-label="${escapeHtml(
+            `${bucketLabel(revenueRange, x.key, { long: true })}: ${inr(x.revenuePaise)}, ${x.orders} orders`
+          )}"><span class="rev-bar" style="height:${x.revenuePaise > 0 ? Math.max(1.5, (x.revenuePaise / max) * 100) : 0}%"></span></button>`
+        )
+        .join("")}</div>
+      ${allZero ? `<div class="rev-empty">No paid orders in this period yet</div>` : ""}
+      <div class="rev-tip" id="rev-tip" hidden></div>
+    </div>
+    <div class="rev-xaxis" aria-hidden="true">${series
+      .map((x, i) => `<span>${labelled(i) ? escapeHtml(bucketLabel(revenueRange, x.key)) : ""}</span>`)
+      .join("")}</div>`;
+
+  const tip = qs("#rev-tip");
+  const plot = qs(".rev-plot");
+  const show = (col) => {
+    const x = series[Number(col.dataset.i)];
+    qsa(".rev-col.is-active").forEach((c) => c.classList.remove("is-active"));
+    col.classList.add("is-active");
+    tip.innerHTML = `<div>${escapeHtml(bucketLabel(revenueRange, x.key, { long: true }))}</div><strong>${inr(x.revenuePaise)}</strong><div>${x.orders} paid order${x.orders === 1 ? "" : "s"}${
+      x.refundsPaise ? ` · ${inr(x.refundsPaise)} refunded` : ""
+    }</div>`;
+    const pr = plot.getBoundingClientRect();
+    const cr = col.getBoundingClientRect();
+    const bar = col.firstElementChild.getBoundingClientRect();
+    const left = Math.min(Math.max(cr.left + cr.width / 2 - pr.left, 70), pr.width - 70);
+    tip.style.left = `${left}px`;
+    tip.style.top = `${Math.min(bar.top - pr.top, pr.height - 10)}px`;
+    tip.hidden = false;
+  };
+  const hide = () => {
+    tip.hidden = true;
+    qsa(".rev-col.is-active").forEach((c) => c.classList.remove("is-active"));
+  };
+  qsa(".rev-col").forEach((col) => {
+    col.addEventListener("mouseenter", () => show(col));
+    col.addEventListener("focus", () => show(col));
+    col.addEventListener("click", () => show(col));
+    col.addEventListener("blur", hide);
+  });
+  plot.addEventListener("mouseleave", hide);
+
+  qs("#rev-table").innerHTML = `<thead><tr><th scope="col">${revenueRange === "daily" ? "Day" : revenueRange === "monthly" ? "Month" : "Year"}</th><th scope="col">Revenue</th><th scope="col">Paid orders</th><th scope="col">Refunded</th></tr></thead><tbody>${series
+    .slice()
+    .reverse()
+    .map((x) => `<tr><td>${escapeHtml(bucketLabel(revenueRange, x.key, { long: true }))}</td><td>${inr(x.revenuePaise)}</td><td>${x.orders}</td><td>${x.refundsPaise ? inr(x.refundsPaise) : "—"}</td></tr>`)
+    .join("")}</tbody>`;
+}
+
+function renderTopItems(listEl, items) {
+  listEl.innerHTML = items.length
+    ? items.map((i) => `<li>${escapeHtml(i.name)} <span>· ${i.qty} sold · ${inr(i.revenuePaise)}</span></li>`).join("")
+    : `<li class="empty">No sales yet</li>`;
+}
+
+async function fetchRevenue() {
+  if (qs("#dashboard").hidden) return; // locked / not signed in yet
+  try {
+    const res = await adminFetch("/api/admin/revenue");
+    if (res.status === 401) return handleAuthFailure();
+    if (!res.ok) throw new Error("bad status");
+    revenueData = await res.json();
+    qs("#revenue-basis").textContent = `Paid orders only, after refunds · India time${
+      revenueData.excludesDemo ? " · demo test orders excluded" : paymentsInfo.isLive ? "" : " · includes demo payments (no real money yet)"
+    }`;
+    renderRevenueTiles(revenueData);
+    renderRevenueChart();
+    renderTopItems(qs("#rev-top-month"), revenueData.topItems.thisMonth);
+    renderTopItems(qs("#rev-top-year"), revenueData.topItems.thisYear);
+  } catch (_e) {
+    qs("#rev-tiles").innerHTML = `<p class="empty-note">Couldn't load revenue. It will retry in a minute.</p>`;
+  }
+}
+qsa("[data-range]").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    revenueRange = btn.dataset.range;
+    if (revenueData) renderRevenueChart();
+  })
+);
+let revenueResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(revenueResizeTimer);
+  revenueResizeTimer = setTimeout(() => {
+    if (revenueData && activeTab === "revenue") renderRevenueChart();
+  }, 150);
+});

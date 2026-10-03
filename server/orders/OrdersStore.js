@@ -48,6 +48,19 @@ class OrdersStore {
   setDeliveryOrderId(_orderId, _deliveryOrderId) {
     throw new Error("setDeliveryOrderId() must be implemented by a subclass");
   }
+
+  /** The order whose payment.gatewayOrderId matches (the payment gateway's own order id). */
+  getOrderByGatewayOrderId(_gatewayOrderId) {
+    throw new Error("getOrderByGatewayOrderId() must be implemented by a subclass");
+  }
+
+  /** Writes a new `payment` object and/or moves `status` (recorded in statusHistory). See server/payments/service.js. */
+  updateOrder(_orderId, _fields) {
+    throw new Error("updateOrder() must be implemented by a subclass");
+  }
+
+  /** Demo only: auto-advance a paid order through the fulfilment steps. */
+  startDemoProgression(_orderId) {}
 }
 
 module.exports = { OrdersStore };

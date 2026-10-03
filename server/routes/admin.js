@@ -17,6 +17,11 @@ const { adminAuth } = require("../middleware/adminAuth");
 const { getAdminAuthMode } = require("../lib/adminAuthConfig");
 const { validateBody } = require("../lib/validation");
 const { asyncHandler } = require("../lib/asyncHandler");
+const { reviewQrSvg, reviewQrPng, reviewPageUrl } = require("./review");
+const payments = require("../payments/service");
+const { computeRevenue } = require("../lib/revenue");
+const { getPaymentProvider } = require("../payments");
+const { listUnmatched, resolveUnmatched } = require("../payments/unmatchedStore");
 
 const idSchema = z.string().uuid();
 
@@ -110,7 +115,12 @@ router.get(
   "/orders",
   asyncHandler(async (req, res) => {
     const limit = req.query.limit ? Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50)) : 100;
-    res.json({ orders: await getAllOrders({ limit }) });
+    // Each dashboard refresh also expires unpaid orders past their payment
+    // window and re-checks a few unpaid ones with the gateway — this is what
+    // catches "customer paid, then closed the page" without a webhook.
+    const orders = await payments.sweep(await getAllOrders({ limit }));
+    const provider = getPaymentProvider();
+    res.json({ orders, payments: { provider: provider.name, isLive: provider.isLive } });
   })
 );
 
@@ -138,9 +148,74 @@ router.put(
   asyncHandler(async (req, res) => {
     const parsed = idSchema.safeParse(req.params.id);
     if (!parsed.success) return res.status(404).json({ error: "Order not found." });
+    const existing = await getOrder(parsed.data);
+    if (!existing) return res.status(404).json({ error: "Order not found." });
+    // Never start preparing an order that hasn't been paid for.
+    if (existing.payment && !["PAID", "PARTIALLY_REFUNDED"].includes(existing.payment.status)) {
+      return res.status(409).json({ error: "Payment hasn't been received for this order yet." });
+    }
     const order = await advanceStatus(parsed.data);
+    res.json({ order });
+  })
+);
+
+/** Revenue by day (last 30), month (last 12) and year — see server/lib/revenue.js for what counts. */
+router.get(
+  "/revenue",
+  asyncHandler(async (req, res) => {
+    const provider = getPaymentProvider();
+    const orders = await getAllOrders();
+    res.json(computeRevenue(orders, { liveProvider: provider.isLive ? provider.name : null }));
+  })
+);
+
+/** "Check payment": ask the gateway for this order's payments right now. */
+router.post(
+  "/orders/:id/reconcile",
+  asyncHandler(async (req, res) => {
+    const parsed = idSchema.safeParse(req.params.id);
+    if (!parsed.success) return res.status(404).json({ error: "Order not found." });
+    let order = await getOrder(parsed.data);
+    if (!order) return res.status(404).json({ error: "Order not found." });
+    if (!order.payment) return res.json({ order });
+    try {
+      order = await payments.reconcileOrder(order.orderId, "owner-check");
+      order = await payments.expireIfStale(order);
+    } catch (err) {
+      return res.status(502).json({ error: `Couldn't reach the payment gateway: ${err.message}` });
+    }
+    res.json({ order });
+  })
+);
+
+const issueSchema = z.object({ code: z.string().trim().min(1).max(40), paymentId: z.string().trim().max(64).optional() });
+router.post(
+  "/orders/:id/issues/resolve",
+  validateBody(issueSchema),
+  asyncHandler(async (req, res) => {
+    const parsed = idSchema.safeParse(req.params.id);
+    if (!parsed.success) return res.status(404).json({ error: "Order not found." });
+    const order = await payments.resolveIssue(parsed.data, req.body.code, req.body.paymentId);
     if (!order) return res.status(404).json({ error: "Order not found." });
     res.json({ order });
+  })
+);
+
+/** Payments the gateway reported that match no order (usually need a refund). */
+router.get(
+  "/payment-issues",
+  asyncHandler(async (req, res) => {
+    res.json({ unmatched: await listUnmatched() });
+  })
+);
+router.post(
+  "/payment-issues/:paymentId/resolve",
+  asyncHandler(async (req, res) => {
+    const id = String(req.params.paymentId || "");
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) return res.status(404).json({ error: "Not found." });
+    const ok = await resolveUnmatched(id);
+    if (!ok) return res.status(404).json({ error: "Not found." });
+    res.json({ ok: true });
   })
 );
 
@@ -162,6 +237,25 @@ router.get(
       entries = [];
     }
     res.json({ activeProvider: provider.name, entries });
+  })
+);
+
+/**
+ * Review QR code for the printable counter card in the dashboard. The QR
+ * opens the public review page (<site>/review/); only printing the card is
+ * owner-only.
+ */
+router.get("/review-qr.json", (req, res) => res.json({ reviewPageUrl: reviewPageUrl(req) }));
+router.get(
+  "/review-qr.svg",
+  asyncHandler(async (req, res) => {
+    res.type("image/svg+xml").set("Cache-Control", "no-store").send(await reviewQrSvg(req));
+  })
+);
+router.get(
+  "/review-qr.png",
+  asyncHandler(async (req, res) => {
+    res.type("image/png").set("Cache-Control", "no-store").send(await reviewQrPng(req));
   })
 );
 

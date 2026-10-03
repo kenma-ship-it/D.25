@@ -19,7 +19,10 @@ const helmet = require("helmet");
  *   configured, so the default zero-config deployment stays locked to
  *   same-origin only.
  */
-function securityHeaders(extraConnectSrc = []) {
+function securityHeaders(extraConnectSrc = [], { razorpay = false } = {}) {
+  const rzp = razorpay
+    ? { script: ["https://checkout.razorpay.com"], frame: ["https://api.razorpay.com", "https://checkout.razorpay.com"], connect: ["https://api.razorpay.com", "https://lumberjack.razorpay.com"], img: ["https://cdn.razorpay.com"] }
+    : { script: [], frame: [], connect: [], img: [] };
   return helmet({
     contentSecurityPolicy: {
       directives: {
@@ -29,10 +32,11 @@ function securityHeaders(extraConnectSrc = []) {
         // this site — everything else is same-origin.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-        imgSrc: ["'self'", "data:", "blob:"],
+        scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", ...rzp.script],
+        frameSrc: ["'self'", ...rzp.frame],
+        imgSrc: ["'self'", "data:", "blob:", ...rzp.img],
         mediaSrc: ["'self'"],
-        connectSrc: ["'self'", ...extraConnectSrc],
+        connectSrc: ["'self'", ...extraConnectSrc, ...rzp.connect],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'self'"],

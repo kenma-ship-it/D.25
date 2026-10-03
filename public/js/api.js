@@ -42,6 +42,12 @@ export const api = {
   getDeliveryQuote: (address) => request("/api/delivery/quote", { method: "POST", body: JSON.stringify({ address }) }),
   checkout: (payload) => request("/api/checkout", { method: "POST", body: JSON.stringify(payload) }),
   getOrder: (orderId) => request(`/api/orders/${encodeURIComponent(orderId)}`),
+  startPayment: (orderId) => request(`/api/payments/${encodeURIComponent(orderId)}/start`, { method: "POST", body: "{}" }),
+  verifyPayment: (orderId, razorpayResponse) =>
+    request(`/api/payments/${encodeURIComponent(orderId)}/verify`, { method: "POST", body: JSON.stringify(razorpayResponse) }),
+  demoPay: (orderId, outcome) => request(`/api/payments/${encodeURIComponent(orderId)}/demo`, { method: "POST", body: JSON.stringify({ outcome }) }),
+  reportPaymentFailure: (orderId, details) =>
+    request(`/api/payments/${encodeURIComponent(orderId)}/client-failure`, { method: "POST", body: JSON.stringify(details) }),
   getOrdersByPhone: (phone, verificationToken) =>
     request(`/api/orders/by-phone/${encodeURIComponent(phone)}`, {
       headers: { "Content-Type": "application/json", "X-Phone-Verification": verificationToken || "" },

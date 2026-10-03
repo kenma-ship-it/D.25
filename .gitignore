@@ -6,3 +6,4 @@ data/custom-enquiries.json
 data/orders.json
 data/notifications.json
 .unlazy/
+data/payment-issues.json

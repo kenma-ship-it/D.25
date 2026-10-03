@@ -58,4 +58,18 @@ const phoneTargetLimiter = rateLimit({
   message: { error: "Too many lookups for this number — please try again later." },
 });
 
-module.exports = { apiLimiter, writeLimiter, aiLimiter, phoneLookupLimiter, phoneTargetLimiter };
+/**
+ * Payment endpoints (start / verify / retry). Separate from writeLimiter so a
+ * customer retrying a failed payment a few times isn't blocked by the budget
+ * they used placing the order — and a verify call after a real payment must
+ * not be refused.
+ */
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — please wait a moment and try again." },
+});
+
+module.exports = { apiLimiter, writeLimiter, aiLimiter, phoneLookupLimiter, phoneTargetLimiter, paymentLimiter };

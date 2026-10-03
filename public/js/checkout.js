@@ -85,6 +85,10 @@ function validateForm() {
   if (!name) {
     setFieldError("cust-name", "Please enter your name.");
     valid = false;
+  } else if (name.split(/\s+/).filter((w) => w.replace(/[^\p{L}]/gu, "").length > 0).length < 2) {
+    // Name + surname, so the owner can tell orders apart on the dashboard.
+    setFieldError("cust-name", "Please enter your first name and surname.");
+    valid = false;
   }
   if (!validatePhone(phone)) {
     setFieldError("cust-phone", "Please enter a 10-digit WhatsApp number.");
@@ -142,15 +146,18 @@ async function handleSubmit(e) {
   };
 
   const submitBtn = qs("#place-order-btn");
+  const submitLabel = submitBtn.textContent;
   submitBtn.disabled = true;
-  submitBtn.textContent = "Placing order…";
+  submitBtn.textContent = "Saving your order…";
 
   try {
     const order = await api.checkout(payload);
+    // The order is saved (awaiting payment) — the cart can go; if payment
+    // fails, the customer retries from the order screen, not by re-ordering.
     clearCart();
     currentDeliveryQuote = null;
     closeCheckout();
-    showOrderStatus(order);
+    showOrderStatus(order, { checkout: order.checkout });
   } catch (err) {
     if (err.data && err.data.needsVerification) {
       phoneVerifier.reset();
@@ -161,7 +168,7 @@ async function handleSubmit(e) {
     }
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = "Place Order";
+    submitBtn.textContent = submitLabel;
   }
 }
 

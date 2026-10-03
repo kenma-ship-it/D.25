@@ -5,6 +5,7 @@ const { asyncHandler } = require("../lib/asyncHandler");
 const { phone: phoneSchema } = require("../lib/validation");
 const { phoneLookupLimiter, phoneTargetLimiter } = require("../middleware/rateLimit");
 const { verifyToken } = require("../lib/phoneVerification");
+const payments = require("../payments/service");
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ function toSummary(order) {
     total: order.total,
     isLiveDelivery: order.deliveryQuote ? order.deliveryQuote.isLive : false,
     createdAt: order.createdAt,
+    payment: payments.customerPaymentSummary(order),
   };
 }
 
@@ -59,7 +61,7 @@ router.get(
     if (!verifyToken(req.get("x-phone-verification") || "", parsed.data)) {
       return res.status(401).json({ error: "Please verify this number with the WhatsApp code first.", needsVerification: true });
     }
-    const orders = await getOrdersByPhone(parsed.data);
+    const orders = await payments.sweep(await getOrdersByPhone(parsed.data), { maxChecks: 2 });
     res.json({ orders: orders.map(toSummary) });
   })
 );
@@ -80,11 +82,15 @@ router.get(
     const parsed = idSchema.safeParse(req.params.id);
     if (!parsed.success) return res.status(404).json({ error: "Order not found." });
 
-    const order = await getOrder(parsed.data);
+    let order = await getOrder(parsed.data);
     if (!order) return res.status(404).json({ error: "Order not found." });
+    // An unpaid order being watched by its customer: expire it or re-check
+    // the gateway (throttled) so "paid but page closed" resolves itself.
+    [order] = await payments.sweep([order], { maxChecks: 1 });
 
     res.json(toSummary(order));
   })
 );
 
 module.exports = router;
+module.exports.toSummary = toSummary;
