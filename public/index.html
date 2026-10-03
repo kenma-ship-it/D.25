@@ -210,7 +210,7 @@
           <li>Your name</li>
           <li>WhatsApp number, confirmed with a 6-digit code</li>
           <li>Delivery address: house / flat, street, area, city and 6-digit pincode</li>
-          <li>Online payment (UPI)</li>
+          <li>Online payment, on the next screen</li>
         </ul>
         <p class="form-required-foot">Email and landmark are optional.</p>
       </div>
@@ -272,8 +272,8 @@
       <p class="field-hint pay-online-only">DE.25 takes <strong>online payment only</strong> &mdash; your order is confirmed once payment goes through.</p>
       <div class="pay-options">
         <label class="pay-option">
-          <input type="radio" name="paymentMethod" value="upi" checked>
-          <span class="po-title">Pay online &middot; UPI</span><span class="po-sub">GPay &middot; PhonePe &middot; Paytm</span>
+          <input type="radio" name="paymentMethod" value="online" checked>
+          <span class="po-title">Pay online</span><span class="po-sub">UPI &middot; GPay &middot; PhonePe &middot; Paytm &mdash; you pay on the next screen</span>
         </label>
       </div>
 
@@ -282,10 +282,34 @@
         <div class="totals-row"><span>Delivery fee</span><span id="checkout-delivery">—</span></div>
         <div class="totals-row totals-row-final"><span>Total</span><span id="checkout-total">₹0</span></div>
       </div>
-      <p class="pay-note">This is a demonstration checkout — no real payment is processed and delivery uses DE.25's demo delivery estimate (see below), not a live courier connection.</p>
+      <p class="pay-note">Next you'll see the payment screen. DE.25 only starts your order and books a courier once your payment is received &mdash; nothing is charged before that.</p>
       <p id="checkout-form-error" class="field-error" hidden></p>
-      <button type="submit" class="primary-btn" id="place-order-btn">Place Order</button>
+      <button type="submit" class="primary-btn" id="place-order-btn">Continue to payment</button>
     </form>
+  </div>
+</div>
+
+<!-- ================= PAYMENT ================= -->
+<div class="overlay" id="payment-overlay" role="dialog" aria-modal="true" aria-labelledby="payment-title" hidden>
+  <div class="sheet sheet-detail sheet-payment">
+    <div class="sheet-head">
+      <h2 id="payment-title">Pay for your order</h2>
+      <button class="sheet-close" id="close-payment" aria-label="Close payment"><svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
+    </div>
+    <div class="pay-summary">
+      <div>
+        <p class="pay-summary-label">Order reference</p>
+        <p class="pay-summary-token" id="payment-token">&mdash;</p>
+      </div>
+      <div class="pay-summary-right">
+        <p class="pay-summary-label">Amount to pay</p>
+        <p class="pay-amount" id="payment-amount">&#8377;0</p>
+      </div>
+    </div>
+    <p class="pay-expiry" id="payment-expiry"></p>
+    <div id="payment-body" class="payment-body"></div>
+    <p id="payment-error" class="field-error" role="alert" hidden></p>
+    <p class="receipt-hint" id="payment-hint"></p>
   </div>
 </div>
 
@@ -293,7 +317,7 @@
 <div class="overlay" id="order-overlay" role="dialog" aria-modal="true" aria-labelledby="order-title" hidden>
   <div class="sheet sheet-detail sheet-order">
     <div class="sheet-head" style="justify-content:center;">
-      <h2 id="order-title"><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-check"/></svg> Order Placed</h2>
+      <h2 id="order-title"><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-check"/></svg> <span id="order-title-text">Order Placed</span></h2>
     </div>
     <div id="order-delivery-badge" class="delivery-badge"></div>
     <p class="order-token-label">Order reference</p>
@@ -301,7 +325,7 @@
     <ol class="status-tracker" id="status-tracker" aria-label="Order status"></ol>
     <div id="order-lines" class="receipt-list"></div>
     <div class="totals-row"><span>Total</span><span id="order-total">₹0</span></div>
-    <p class="receipt-hint">This demo re-checks status every few seconds to simulate progress. In production this would update from real kitchen/courier events.</p>
+    <p class="receipt-hint" id="order-status-hint">This demo re-checks status every few seconds to simulate progress. In production this would update from real kitchen/courier events.</p>
     <button class="primary-btn" id="close-order-btn">Done</button>
   </div>
 </div>

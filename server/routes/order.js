@@ -5,6 +5,7 @@ const { asyncHandler } = require("../lib/asyncHandler");
 const { phone: phoneSchema } = require("../lib/validation");
 const { phoneLookupLimiter, phoneTargetLimiter } = require("../middleware/rateLimit");
 const { verifyToken } = require("../lib/phoneVerification");
+const { publicPayment } = require("../payments");
 
 const router = express.Router();
 
@@ -22,7 +23,25 @@ function toSummary(order) {
     tax: order.tax,
     total: order.total,
     isLiveDelivery: order.deliveryQuote ? order.deliveryQuote.isLive : false,
+    deliveryEnvironment: order.deliveryQuote ? order.deliveryQuote.environment || null : null,
+    delivery: publicDelivery(order.delivery),
+    payment: publicPayment(order.payment),
     createdAt: order.createdAt,
+  };
+}
+
+// The customer-safe part of the courier booking: no courier phone, no raw
+// Borzo payloads, no error internals.
+function publicDelivery(d) {
+  if (!d) return null;
+  return {
+    provider: d.provider,
+    environment: d.environment || null,
+    isLive: Boolean(d.isLive),
+    status: d.status,
+    statusLabel: d.statusLabel,
+    trackingUrl: d.trackingUrl || null,
+    courierName: d.courier ? d.courier.name : null,
   };
 }
 
@@ -88,3 +107,4 @@ router.get(
 );
 
 module.exports = router;
+module.exports.toSummary = toSummary;

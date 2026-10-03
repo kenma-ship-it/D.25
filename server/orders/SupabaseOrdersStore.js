@@ -32,14 +32,7 @@ const crypto = require("crypto");
 const { OrdersStore } = require("./OrdersStore");
 const { restRequest } = require("../lib/supabaseRest");
 
-const STATUSES = [
-  "ORDER_PLACED",
-  "PAYMENT_CONFIRMED",
-  "PREPARING",
-  "READY_FOR_DELIVERY",
-  "OUT_FOR_DELIVERY",
-  "DELIVERED",
-];
+const { STATUSES, ALL_STATUSES, AWAITING_PAYMENT } = require("./statuses");
 
 const TABLE = "orders";
 
@@ -68,7 +61,11 @@ function toRow(order) {
     total: order.total,
     delivery_quote: order.deliveryQuote,
     payment_method: order.paymentMethod,
+    payment: order.payment || null,
+    customer_phone_verified: Boolean(order.customerPhoneVerified),
     delivery_order_id: order.deliveryOrderId,
+    delivery: order.delivery || null,
+    is_sample: Boolean(order.isSample),
     status: order.status,
     status_history: order.statusHistory,
     created_at: order.createdAt,
@@ -90,7 +87,11 @@ function fromRow(row) {
     total: row.total,
     deliveryQuote: row.delivery_quote,
     paymentMethod: row.payment_method,
+    payment: row.payment || null,
+    customerPhoneVerified: Boolean(row.customer_phone_verified),
     deliveryOrderId: row.delivery_order_id,
+    delivery: row.delivery || null,
+    isSample: Boolean(row.is_sample),
     status: row.status,
     statusHistory: row.status_history,
     createdAt: row.created_at,
@@ -107,10 +108,12 @@ class SupabaseOrdersStore extends OrdersStore {
     return "supabase";
   }
 
-  async createOrder({ customer, address, pricing, paymentMethod, deliveryOrderId }) {
+  async createOrder({ customer, address, pricing, paymentMethod, payment = null, customerPhoneVerified = false, deliveryOrderId, isSample = false }) {
     const orderId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const initialStatus = paymentMethod === "upi" ? "PAYMENT_CONFIRMED" : "ORDER_PLACED";
+    // Every order waits for a confirmed payment before anything else
+    // happens to it — see server/payments/index.js.
+    const initialStatus = AWAITING_PAYMENT;
 
     const order = {
       orderId,
@@ -125,7 +128,14 @@ class SupabaseOrdersStore extends OrdersStore {
       total: pricing.total,
       deliveryQuote: pricing.deliveryQuote,
       paymentMethod,
+      // { method, status: pending|paid|expired|failed, amountPaise, … }
+      payment,
+      // Whether the customer proved this WhatsApp number at checkout — the
+      // receipt goes out after payment, so the answer has to be kept.
+      customerPhoneVerified: Boolean(customerPhoneVerified),
       deliveryOrderId: deliveryOrderId || null,
+      delivery: null,
+      isSample: Boolean(isSample),
       status: initialStatus,
       statusHistory: [{ status: initialStatus, at: now }],
       createdAt: now,
@@ -136,9 +146,7 @@ class SupabaseOrdersStore extends OrdersStore {
       body: toRow(order),
       prefer: "return=representation",
     });
-    const saved = fromRow(Array.isArray(rows) ? rows[0] : rows) || order;
-    this._scheduleDemoProgression(saved.orderId, saved.status);
-    return saved;
+    return fromRow(Array.isArray(rows) ? rows[0] : rows) || order;
   }
 
   async getOrder(orderId) {
@@ -166,7 +174,7 @@ class SupabaseOrdersStore extends OrdersStore {
   }
 
   async setStatus(orderId, status) {
-    if (!STATUSES.includes(status)) return this.getOrder(orderId);
+    if (!ALL_STATUSES.includes(status)) return this.getOrder(orderId);
     const existing = await this.getOrder(orderId);
     if (!existing) return null;
     const statusHistory = [...existing.statusHistory, { status, at: new Date().toISOString() }];
@@ -195,6 +203,41 @@ class SupabaseOrdersStore extends OrdersStore {
       prefer: "return=representation",
     });
     return fromRow(Array.isArray(rows) ? rows[0] : null);
+  }
+
+  async setDelivery(orderId, delivery) {
+    const body = { delivery };
+    if (delivery && delivery.deliveryOrderId) body.delivery_order_id = delivery.deliveryOrderId;
+    const rows = await restRequest(TABLE, {
+      method: "PATCH",
+      query: { order_id: `eq.${orderId}` },
+      body,
+      prefer: "return=representation",
+    });
+    return fromRow(Array.isArray(rows) ? rows[0] : null);
+  }
+
+  async setPayment(orderId, payment, { status, onlyIfStatus } = {}) {
+    const existing = await this.getOrder(orderId);
+    if (!existing) return null;
+    if (onlyIfStatus && existing.status !== onlyIfStatus) return null;
+    const body = { payment };
+    if (status && status !== existing.status && ALL_STATUSES.includes(status)) {
+      body.status = status;
+      body.status_history = [...existing.statusHistory, { status, at: new Date().toISOString() }];
+    }
+    // The status filter makes this a compare-and-set in Postgres too: if
+    // another server instance confirmed the payment first, no row matches
+    // and this returns null.
+    const query = { order_id: `eq.${orderId}` };
+    if (onlyIfStatus) query.status = `eq.${onlyIfStatus}`;
+    const rows = await restRequest(TABLE, { method: "PATCH", query, body, prefer: "return=representation" });
+    return fromRow(Array.isArray(rows) ? rows[0] : null);
+  }
+
+  async startDemoProgression(orderId) {
+    const order = await this.getOrder(orderId);
+    if (order) this._scheduleDemoProgression(orderId, order.status);
   }
 
   /**

@@ -25,20 +25,38 @@ class DemoDeliveryProvider extends DeliveryProvider {
     const variation = (pin.charCodeAt(pin.length - 1) || 0) % 30;
     const feeRupees = 40 + variation;
     const etaMinutes = 45 + variation;
-    return { provider: this.name, feeRupees, etaMinutes, isLive: false };
+    return { provider: this.name, environment: "demo", feeRupees, etaMinutes, isLive: false };
   }
 
+  // Same shape as BorzoDeliveryProvider's delivery record, so the dashboard
+  // renders both the same way — but status "simulated" and no tracking
+  // link or courier, because no courier exists.
   async createDeliveryOrder(order) {
     return {
       provider: this.name,
-      deliveryOrderId: `DEMO-${order.orderId}`,
-      status: "demo_created",
+      environment: "demo",
       isLive: false,
+      deliveryOrderId: `DEMO-${order.orderId}`,
+      borzoStatus: null,
+      status: "simulated",
+      statusLabel: "Simulated — no courier booked",
+      trackingUrl: null,
+      courier: null,
+      feeRupees: null,
     };
   }
 
   async getDeliveryStatus(deliveryOrderId) {
-    return { provider: this.name, status: "demo_pending", isLive: false, deliveryOrderId };
+    return {
+      provider: this.name,
+      environment: "demo",
+      isLive: false,
+      deliveryOrderId,
+      status: "simulated",
+      statusLabel: "Simulated — no courier booked",
+      trackingUrl: null,
+      courier: null,
+    };
   }
 
   async cancelDelivery(deliveryOrderId) {

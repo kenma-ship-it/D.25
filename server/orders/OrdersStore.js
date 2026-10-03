@@ -48,6 +48,31 @@ class OrdersStore {
   setDeliveryOrderId(_orderId, _deliveryOrderId) {
     throw new Error("setDeliveryOrderId() must be implemented by a subclass");
   }
+
+  /**
+   * Stores the full courier-booking record (provider, environment, courier
+   * order id, status, tracking link, courier, last error) — written once
+   * after booking and again by every status sync. Same never-crash rules
+   * as setDeliveryOrderId above.
+   */
+  setDelivery(_orderId, _delivery) {
+    throw new Error("setDelivery() must be implemented by a subclass");
+  }
+
+  /**
+   * Stores order.payment and optionally moves the status with it. With
+   * onlyIfStatus it's a compare-and-set: nothing is written, and null is
+   * returned, unless the order is still in that status — this is what
+   * stops one payment being confirmed (and dispatched) twice.
+   */
+  setPayment(_orderId, _payment, _opts) {
+    throw new Error("setPayment() must be implemented by a subclass");
+  }
+
+  /** Starts the demo kitchen timer for a paid order with no real courier. */
+  startDemoProgression(_orderId) {
+    throw new Error("startDemoProgression() must be implemented by a subclass");
+  }
 }
 
 module.exports = { OrdersStore };

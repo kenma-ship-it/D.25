@@ -19,7 +19,12 @@ const helmet = require("helmet");
  *   configured, so the default zero-config deployment stays locked to
  *   same-origin only.
  */
-function securityHeaders(extraConnectSrc = []) {
+/**
+ * @param {{scriptSrc?: string[], frameSrc?: string[], imgSrc?: string[], connectSrc?: string[]}} extra -
+ *   further origins for one integration, e.g. Razorpay Checkout's script and
+ *   iframe — passed only when that integration is active (server/index.js).
+ */
+function securityHeaders(extraConnectSrc = [], extra = {}) {
   return helmet({
     contentSecurityPolicy: {
       directives: {
@@ -29,10 +34,11 @@ function securityHeaders(extraConnectSrc = []) {
         // this site — everything else is same-origin.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-        imgSrc: ["'self'", "data:", "blob:"],
+        scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", ...(extra.scriptSrc || [])],
+        imgSrc: ["'self'", "data:", "blob:", ...(extra.imgSrc || [])],
         mediaSrc: ["'self'"],
-        connectSrc: ["'self'", ...extraConnectSrc],
+        connectSrc: ["'self'", ...extraConnectSrc, ...(extra.connectSrc || [])],
+        frameSrc: ["'self'", ...(extra.frameSrc || [])],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameAncestors: ["'self'"],
@@ -68,4 +74,11 @@ function requireSameOrigin(req, res, next) {
   return res.status(403).json({ error: "Request rejected: cross-origin request not allowed." });
 }
 
-module.exports = { securityHeaders, requireSameOrigin };
+/** Extra CSP sources for the active payment method: Razorpay Checkout is a script plus an iframe from razorpay.com. */
+function paymentCspSources(method) {
+  if (method !== "razorpay") return {};
+  const razorpay = ["https://*.razorpay.com"];
+  return { scriptSrc: razorpay, frameSrc: razorpay, imgSrc: razorpay, connectSrc: razorpay };
+}
+
+module.exports = { securityHeaders, requireSameOrigin, paymentCspSources };

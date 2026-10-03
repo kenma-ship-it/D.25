@@ -26,5 +26,11 @@ module.exports = {
   setStatus: orders.setStatus,
   advanceStatus: orders.advanceStatus,
   setDeliveryOrderId: orders.setDeliveryOrderId,
+  setDelivery: orders.setDelivery,
+  setPayment: orders.setPayment,
+  startDemoProgression: orders.startDemoProgression,
   STATUSES: orders.STATUSES,
+  ALL_STATUSES: orders.ALL_STATUSES,
+  AWAITING_PAYMENT: orders.AWAITING_PAYMENT,
+  CANCELLED: orders.CANCELLED,
 };

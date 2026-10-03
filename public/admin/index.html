@@ -59,6 +59,72 @@
   <div id="new-order-banner" class="new-order-banner" role="status" hidden></div>
 
   <main class="dash-main">
+    <section class="borzo-panel payments-panel" aria-labelledby="payments-title">
+      <div class="panel-head">
+        <h2 id="payments-title">Payments <span id="payments-mode" class="mode-pill">…</span></h2>
+        <p class="panel-note">An order reaches the kitchen and a courier only once it's paid · payment secrets never leave the server</p>
+      </div>
+      <div class="borzo-grid">
+        <div class="borzo-card">
+          <h3>Setup</h3>
+          <ul id="payments-checklist" class="borzo-checklist"><li>Loading…</li></ul>
+        </div>
+        <div class="borzo-card">
+          <h3>Today</h3>
+          <dl id="payments-stats" class="borzo-stats"></dl>
+        </div>
+        <div class="borzo-card">
+          <h3>How it works</h3>
+          <p id="payments-howto" class="action-hint"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="borzo-panel" aria-labelledby="borzo-title">
+      <div class="panel-head">
+        <h2 id="borzo-title">Borzo delivery API <span id="borzo-mode" class="mode-pill">…</span></h2>
+        <p class="panel-note">Every row in the log is a real HTTPS exchange with Borzo's servers · tokens are never logged</p>
+      </div>
+
+      <div class="borzo-grid">
+        <div class="borzo-card">
+          <h3>Setup</h3>
+          <ul id="borzo-checklist" class="borzo-checklist"><li>Loading…</li></ul>
+        </div>
+        <div class="borzo-card">
+          <h3>API traffic</h3>
+          <dl id="borzo-stats" class="borzo-stats"></dl>
+        </div>
+        <div class="borzo-card borzo-actions">
+          <h3>Try it</h3>
+          <button type="button" id="borzo-check-btn" class="action-btn">Run live connection check</button>
+          <p class="action-hint">Calls Borzo's sandbox and production servers right now (price check only — never books a courier).</p>
+          <div class="sample-row">
+            <label for="sample-count">Sample orders</label>
+            <select id="sample-count">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+            </select>
+            <button type="button" id="borzo-sample-btn" class="action-btn">Create</button>
+          </div>
+          <p id="sample-hint" class="action-hint"></p>
+          <p id="borzo-action-msg" class="action-msg" role="status"></p>
+        </div>
+      </div>
+
+      <div id="borzo-check-result" class="check-result" hidden></div>
+
+      <div class="activity-head">
+        <h3>Live API log</h3>
+        <p id="borzo-last-sync" class="panel-note"></p>
+      </div>
+      <ol id="borzo-activity" class="activity-list" aria-live="polite">
+        <li class="empty-note">Loading…</li>
+      </ol>
+    </section>
+
     <section class="orders-panel" aria-label="Orders">
       <div class="panel-head">
         <h2>Orders <span id="order-count" class="count-badge">0</span></h2>

@@ -15,14 +15,7 @@ const { OrdersStore } = require("./OrdersStore");
 
 const ORDERS_PATH = path.join(__dirname, "..", "..", "data", "orders.json");
 
-const STATUSES = [
-  "ORDER_PLACED",
-  "PAYMENT_CONFIRMED",
-  "PREPARING",
-  "READY_FOR_DELIVERY",
-  "OUT_FOR_DELIVERY",
-  "DELIVERED",
-];
+const { STATUSES, ALL_STATUSES, AWAITING_PAYMENT } = require("./statuses");
 
 function generateToken() {
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -79,10 +72,12 @@ class JsonFileOrdersStore extends OrdersStore {
   // file's header and server/orders/OrdersStore.js for why the interface
   // is Promise-based even though this implementation never actually awaits
   // anything.
-  async createOrder({ customer, address, pricing, paymentMethod, deliveryOrderId }) {
+  async createOrder({ customer, address, pricing, paymentMethod, payment = null, customerPhoneVerified = false, deliveryOrderId, isSample = false }) {
     const orderId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const initialStatus = paymentMethod === "upi" ? "PAYMENT_CONFIRMED" : "ORDER_PLACED";
+    // Every order waits for a confirmed payment before anything else
+    // happens to it — see server/payments/index.js.
+    const initialStatus = AWAITING_PAYMENT;
 
     const order = {
       orderId,
@@ -97,7 +92,16 @@ class JsonFileOrdersStore extends OrdersStore {
       total: pricing.total,
       deliveryQuote: pricing.deliveryQuote,
       paymentMethod,
+      // { method, status: pending|paid|expired|failed, amountPaise, … }
+      payment,
+      // Whether the customer proved this WhatsApp number at checkout — the
+      // receipt goes out after payment, so the answer has to be kept.
+      customerPhoneVerified: Boolean(customerPhoneVerified),
       deliveryOrderId: deliveryOrderId || null,
+      // Courier booking details (provider, Borzo order id, status, tracking
+      // link, courier) — filled in by setDelivery() once the provider answers.
+      delivery: null,
+      isSample: Boolean(isSample),
       status: initialStatus,
       statusHistory: [{ status: initialStatus, at: now }],
       createdAt: now,
@@ -105,7 +109,6 @@ class JsonFileOrdersStore extends OrdersStore {
 
     this.orders.set(orderId, order);
     this._persist();
-    this._scheduleDemoProgression(orderId);
     return order;
   }
 
@@ -129,7 +132,7 @@ class JsonFileOrdersStore extends OrdersStore {
   async setStatus(orderId, status) {
     const order = this.orders.get(orderId);
     if (!order) return null;
-    if (!STATUSES.includes(status)) return order;
+    if (!ALL_STATUSES.includes(status)) return order;
     order.status = status;
     order.statusHistory.push({ status, at: new Date().toISOString() });
     this._persist();
@@ -150,6 +153,34 @@ class JsonFileOrdersStore extends OrdersStore {
     order.deliveryOrderId = deliveryOrderId;
     this._persist();
     return order;
+  }
+
+  async setDelivery(orderId, delivery) {
+    const order = this.orders.get(orderId);
+    if (!order) return null;
+    order.delivery = delivery;
+    if (delivery && delivery.deliveryOrderId) order.deliveryOrderId = delivery.deliveryOrderId;
+    this._persist();
+    return order;
+  }
+
+  async setPayment(orderId, payment, { status, onlyIfStatus } = {}) {
+    const order = this.orders.get(orderId);
+    if (!order) return null;
+    // Check-and-set with no await in between, so two confirmations of the
+    // same payment can't both win.
+    if (onlyIfStatus && order.status !== onlyIfStatus) return null;
+    order.payment = payment;
+    if (status && status !== order.status && ALL_STATUSES.includes(status)) {
+      order.status = status;
+      order.statusHistory.push({ status, at: new Date().toISOString() });
+    }
+    this._persist();
+    return order;
+  }
+
+  async startDemoProgression(orderId) {
+    if (this.orders.has(orderId)) this._scheduleDemoProgression(orderId);
   }
 
   /**

@@ -4,6 +4,7 @@ import { getCart, clearCart } from "./state.js";
 import { getLatestPricing } from "./cart.js";
 import { closeCart } from "./cart.js";
 import { showOrderStatus } from "./orderStatus.js";
+import { showPayment } from "./payment.js";
 import { createPhoneVerifier } from "./phoneVerify.js";
 
 let releaseFocusTrap = null;
@@ -59,11 +60,16 @@ async function handleGetQuote() {
   try {
     const quote = await api.getDeliveryQuote(address);
     currentDeliveryQuote = quote;
-    const tag = quote.isLive ? "Live Borzo estimate" : "Demo delivery estimate";
+    const isSandbox = quote.isLive && quote.environment === "test";
+    const tag = quote.isLive ? (isSandbox ? "Borzo sandbox estimate" : "Live Borzo estimate") : "Demo delivery estimate";
     resultEl.innerHTML = `<span class="qr-tag">${escapeHtml(tag)}</span>Delivery fee: <strong>${formatCurrency(
       quote.feeRupees
     )}</strong> · Estimated arrival: <strong>~${escapeHtml(String(quote.etaMinutes))} min</strong> after pickup${
-      quote.isLive ? "" : "<br><span style=\"color:var(--muted);font-size:11.5px;\">Borzo delivery isn't connected yet — this is a placeholder estimate for the demo.</span>"
+      isSandbox
+        ? "<br><span style=\"color:var(--muted);font-size:11.5px;\">A real price from Borzo's test environment — test bookings never send a rider.</span>"
+        : quote.isLive
+          ? ""
+          : "<br><span style=\"color:var(--muted);font-size:11.5px;\">Borzo delivery isn't connected yet — this is a placeholder estimate for the demo.</span>"
     }`;
     updateTotalsDisplay();
   } catch (err) {
@@ -143,14 +149,21 @@ async function handleSubmit(e) {
 
   const submitBtn = qs("#place-order-btn");
   submitBtn.disabled = true;
-  submitBtn.textContent = "Placing order…";
+  submitBtn.textContent = "Starting payment…";
 
   try {
-    const order = await api.checkout(payload);
-    clearCart();
+    // The order is stored as AWAITING_PAYMENT; nothing goes to the kitchen
+    // or a courier until the payment step below completes. The cart stays
+    // until then, so leaving the payment screen loses nothing.
+    const placed = await api.checkout(payload);
     currentDeliveryQuote = null;
     closeCheckout();
-    showOrderStatus(order);
+    showPayment(placed, {
+      onPaid: (summary) => {
+        clearCart();
+        showOrderStatus(summary);
+      },
+    });
   } catch (err) {
     if (err.data && err.data.needsVerification) {
       phoneVerifier.reset();
@@ -161,7 +174,7 @@ async function handleSubmit(e) {
     }
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = "Place Order";
+    submitBtn.textContent = "Continue to payment";
   }
 }
 

@@ -1,12 +1,19 @@
-require("dotenv").config();
+// Resolve .env next to the project, not the shell's cwd, so `node server/index.js`
+// behaves the same whichever directory it is launched from.
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
 const express = require("express");
 const path = require("path");
 
-const { securityHeaders, requireSameOrigin } = require("./middleware/security");
+const { securityHeaders, requireSameOrigin, paymentCspSources } = require("./middleware/security");
 const { apiLimiter, writeLimiter, aiLimiter } = require("./middleware/rateLimit");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { getAdminAuthMode } = require("./lib/adminAuthConfig");
+const { resolveBorzoConfig } = require("./delivery/borzoConfig");
+const { startBorzoSync } = require("./delivery/borzoSync");
+const { resolvePaymentConfig } = require("./payments/paymentConfig");
+const { handleRazorpayWebhook, startPaymentSweeper } = require("./payments");
+const { asyncHandler } = require("./lib/asyncHandler");
 
 const { initProducts, getActiveProviderName } = require("./products");
 const productsRouter = require("./routes/products");
@@ -18,6 +25,7 @@ const aiGuideRouter = require("./routes/aiGuide");
 const customRouter = require("./routes/custom");
 const adminRouter = require("./routes/admin");
 const verifyRouter = require("./routes/verify");
+const paymentsRouter = require("./routes/payments");
 
 function parseTrustProxy(value) {
   if (value === undefined || value === "" || value === "false" || value === "0") return false;
@@ -39,7 +47,21 @@ app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 // explicit connect-src allowance — see server/middleware/security.js.
 const adminAuthMode = getAdminAuthMode();
 const cspConnectSrc = adminAuthMode.mode === "supabase" ? [adminAuthMode.supabaseUrl] : [];
-app.use(securityHeaders(cspConnectSrc));
+// Razorpay Checkout's script and iframe are allowed only when Razorpay is
+// the active payment method (decided at startup, like the rest of .env).
+app.use(securityHeaders(cspConnectSrc, paymentCspSources(resolvePaymentConfig().method)));
+
+// Razorpay's server-to-server webhook. Registered before express.json()
+// because the signature is an HMAC of the exact raw bytes Razorpay sent.
+app.post(
+  "/api/payments/razorpay/webhook",
+  express.raw({ type: "*/*", limit: "256kb" }),
+  asyncHandler(async (req, res) => {
+    const result = await handleRazorpayWebhook(Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), req.get("x-razorpay-signature"));
+    res.status(result.status).json(result.body);
+  })
+);
+
 app.use(express.json({ limit: "50kb" })); // small, deliberate cap — nothing this app accepts legitimately needs more
 app.use(requireSameOrigin);
 
@@ -62,6 +84,7 @@ app.use("/api/products", productsRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/delivery", writeLimiter, deliveryRouter);
 app.use("/api/checkout", writeLimiter, checkoutRouter);
+app.use("/api/payments", writeLimiter, paymentsRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/verify", writeLimiter, verifyRouter);
 app.use("/api/ai-guide", aiLimiter, aiGuideRouter);
@@ -83,13 +106,24 @@ if (require.main === module) {
       console.log(`DE.25 server listening on http://localhost:${PORT}`);
       // eslint-disable-next-line no-console
       console.log(`[products] ${getActiveProviderName()} catalog active.`);
-      if (String(process.env.BORZO_DELIVERY_ENABLED || "false").toLowerCase() === "true") {
+      const borzo = resolveBorzoConfig();
+      if (borzo.active) {
         // eslint-disable-next-line no-console
-        console.log("[delivery] BORZO_DELIVERY_ENABLED=true");
+        console.log(`[delivery] Borzo ${borzo.environment === "production" ? "PRODUCTION (real couriers)" : "sandbox"} active — ${borzo.baseUrl}`);
+        startBorzoSync();
       } else {
         // eslint-disable-next-line no-console
-        console.log("[delivery] Demo delivery provider active (Borzo disabled).");
+        console.log(`[delivery] Demo delivery provider active. Borzo needs: ${borzo.problems.join("; ")}.`);
       }
+      const pay = resolvePaymentConfig();
+      const payLabel = {
+        razorpay: `Razorpay ${pay.razorpay.mode === "live" ? "LIVE (real money)" : "test mode (no real money)"}${pay.razorpay.webhookSecret ? " + webhook" : ", no webhook secret"}`,
+        demo: "DEMO — payments are simulated, no money moves",
+      }[pay.method];
+      // eslint-disable-next-line no-console
+      console.log(pay.method ? `[payments] ${payLabel}.` : `[payments] NOT AVAILABLE — checkout will refuse orders: ${pay.problems.join("; ")}.`);
+      if (pay.method && pay.problems.length) console.warn(`[payments] note: ${pay.problems.join("; ")}`); // eslint-disable-line no-console
+      startPaymentSweeper();
     });
   });
 }

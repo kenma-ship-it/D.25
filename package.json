@@ -10,6 +10,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node test/run.cjs",
+    "borzo:check": "node scripts/borzo-check.cjs",
     "frames:manifest": "node scripts/build-frame-manifest.cjs",
     "typecheck": "tsc -p tsconfig.json"
   },

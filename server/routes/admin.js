@@ -10,13 +10,21 @@ const fs = require("fs");
 const { z } = require("zod");
 const { getAllProducts, getProductById, setProduct } = require("../lib/datastore");
 const { refreshProducts, getActiveProviderName } = require("../products");
-const { getOrder, getAllOrders, advanceStatus } = require("../lib/orders");
+const { getOrder, getAllOrders, advanceStatus, AWAITING_PAYMENT, CANCELLED } = require("../lib/orders");
 const { getNotificationProvider } = require("../notifications");
 const { LOG_PATH: NOTIFICATIONS_LOG_PATH } = require("../notifications/DemoNotificationProvider");
 const { adminAuth } = require("../middleware/adminAuth");
 const { getAdminAuthMode } = require("../lib/adminAuthConfig");
 const { validateBody } = require("../lib/validation");
 const { asyncHandler } = require("../lib/asyncHandler");
+const { getDeliveryProvider } = require("../delivery");
+const { resolveBorzoConfig, publicBorzoConfig } = require("../delivery/borzoConfig");
+const { listActivity, activityStats } = require("../delivery/borzoActivity");
+const { runConnectionCheck } = require("../delivery/borzoConnectionCheck");
+const { syncBorzoDeliveries, lastSync } = require("../delivery/borzoSync");
+const { createSampleOrders, SampleOrdersRefused } = require("../lib/sampleOrders");
+const { resolvePaymentConfig, describePaymentConfig } = require("../payments/paymentConfig");
+const payments = require("../payments");
 
 const idSchema = z.string().uuid();
 
@@ -138,9 +146,25 @@ router.put(
   asyncHandler(async (req, res) => {
     const parsed = idSchema.safeParse(req.params.id);
     if (!parsed.success) return res.status(404).json({ error: "Order not found." });
+    // An unpaid or cancelled order never enters the kitchen sequence.
+    const current = await getOrder(parsed.data);
+    if (!current) return res.status(404).json({ error: "Order not found." });
+    if (current.status === AWAITING_PAYMENT) return res.status(409).json({ error: "This order hasn't been paid yet." });
+    if (current.status === CANCELLED) return res.status(409).json({ error: "This order was cancelled." });
     const order = await advanceStatus(parsed.data);
     if (!order) return res.status(404).json({ error: "Order not found." });
     res.json({ order });
+  })
+);
+
+/**
+ * Payments panel: which method is collecting money and what's missing,
+ * plus today's totals. Never returns a key secret.
+ */
+router.get(
+  "/payments",
+  asyncHandler(async (req, res) => {
+    res.json({ config: describePaymentConfig(resolvePaymentConfig()), stats: await payments.paymentStats() });
   })
 );
 
@@ -162,6 +186,63 @@ router.get(
       entries = [];
     }
     res.json({ activeProvider: provider.name, entries });
+  })
+);
+
+/**
+ * Borzo panel on the owner dashboard: which delivery provider is active and
+ * why, plus the log of real HTTPS exchanges with Borzo (see
+ * delivery/borzoActivity.js — only real network calls are ever recorded,
+ * never simulated ones). Never returns the token.
+ */
+router.get(
+  "/borzo",
+  asyncHandler(async (req, res) => {
+    const provider = getDeliveryProvider();
+    res.json({
+      activeProvider: provider.name,
+      config: publicBorzoConfig(resolveBorzoConfig()),
+      stats: activityStats(),
+      lastSync: lastSync(),
+      activity: listActivity({ limit: 60 }),
+    });
+  })
+);
+
+// Each check is two real calls to Borzo; a short cooldown keeps a
+// double-click (or a stuck button) from hammering their servers.
+const CHECK_COOLDOWN_MS = 5000;
+let lastCheckAt = 0;
+
+router.post(
+  "/borzo/check",
+  asyncHandler(async (req, res) => {
+    const wait = lastCheckAt + CHECK_COOLDOWN_MS - Date.now();
+    if (wait > 0) return res.status(429).json({ error: `Please wait ${Math.ceil(wait / 1000)}s before checking again.` });
+    lastCheckAt = Date.now();
+    res.json(await runConnectionCheck());
+  })
+);
+
+const sampleOrdersSchema = z.object({ count: z.number().int().min(1).max(5).default(1) });
+
+router.post(
+  "/borzo/sample-orders",
+  validateBody(sampleOrdersSchema),
+  asyncHandler(async (req, res) => {
+    try {
+      res.status(201).json(await createSampleOrders({ count: req.body.count }));
+    } catch (err) {
+      if (err instanceof SampleOrdersRefused) return res.status(409).json({ error: err.message });
+      throw err;
+    }
+  })
+);
+
+router.post(
+  "/borzo/sync",
+  asyncHandler(async (req, res) => {
+    res.json(await syncBorzoDeliveries());
   })
 );
 

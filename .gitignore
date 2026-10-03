@@ -5,4 +5,5 @@ node_modules/
 data/custom-enquiries.json
 data/orders.json
 data/notifications.json
+data/borzo-activity.json
 .unlazy/

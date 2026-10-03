@@ -1,42 +1,44 @@
 const { DemoDeliveryProvider } = require("./DemoDeliveryProvider");
 const { BorzoDeliveryProvider } = require("./BorzoDeliveryProvider");
+const { resolveBorzoConfig } = require("./borzoConfig");
 
 let cachedProvider = null;
 
 /**
  * The single place that decides which DeliveryProvider is active.
  *
- * BORZO_DELIVERY_ENABLED defaults to false/unset, which is the correct
- * state until DE.25 approves going live AND real Borzo credentials exist.
- * Flipping that env var (plus setting BORZO_API_KEY) is the entire
- * migration from demo to live delivery — no route or frontend code needs
- * to change, because everything downstream talks to the DeliveryProvider
- * interface, not to a specific provider class.
+ * Borzo is used only when every switch in ./borzoConfig.js is set:
+ * BORZO_DELIVERY_ENABLED=true, a token, the pickup address and phone, and —
+ * for production only — BORZO_LIVE_CONFIRM. BORZO_ENV defaults to "test"
+ * (Borzo's sandbox: real API, real order ids and tracking pages, no real
+ * courier, no charge). Anything missing falls back to the demo provider
+ * with a loud warning rather than crashing the storefront, and the owner
+ * dashboard's Borzo panel lists exactly what is missing.
+ *
+ * No route or frontend code changes between demo, sandbox and production —
+ * everything downstream talks to the DeliveryProvider interface.
  */
 function getDeliveryProvider() {
   if (cachedProvider) return cachedProvider;
 
-  const borzoEnabled = String(process.env.BORZO_DELIVERY_ENABLED || "false").toLowerCase() === "true";
+  const cfg = resolveBorzoConfig();
 
-  if (borzoEnabled && process.env.BORZO_API_KEY) {
+  if (cfg.active) {
     cachedProvider = new BorzoDeliveryProvider({
-      apiKey: process.env.BORZO_API_KEY,
-      apiUrl: process.env.BORZO_API_URL,
-      pickupAddress: process.env.PICKUP_ADDRESS,
-      pickupPhone: process.env.PICKUP_PHONE,
+      token: cfg.token,
+      environment: cfg.environment,
+      version: cfg.version,
+      vehicleTypeId: cfg.vehicleTypeId,
+      pickup: cfg.pickup,
     });
     return cachedProvider;
   }
 
-  if (borzoEnabled && !process.env.BORZO_API_KEY) {
-    // Fail safe, not silent: someone flipped the flag without setting a key.
-    // Falling back to the demo provider (rather than crashing the server)
-    // keeps the storefront usable, but this is logged loudly so it gets
-    // noticed and fixed rather than mistaken for "Borzo is live".
+  if (cfg.enabled) {
+    // Fail safe, not silent: someone flipped the flag without finishing
+    // setup. Logged loudly so it isn't mistaken for "Borzo is live".
     // eslint-disable-next-line no-console
-    console.warn(
-      "[delivery] BORZO_DELIVERY_ENABLED=true but BORZO_API_KEY is not set — falling back to DemoDeliveryProvider."
-    );
+    console.warn(`[delivery] BORZO_DELIVERY_ENABLED=true but ${cfg.problems.join("; ")} — falling back to DemoDeliveryProvider.`);
   }
 
   cachedProvider = new DemoDeliveryProvider();

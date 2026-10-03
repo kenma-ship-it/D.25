@@ -874,3 +874,25 @@ button{ cursor: pointer; }
 .toast-region{ position: fixed; top: var(--space-lg); left: 50%; transform: translateX(-50%); z-index: 400; display: flex; flex-direction: column; gap: 8px; width: min(420px, 92vw); }
 .toast{ background: var(--black); color: var(--warm-white); padding: 12px 18px; border-radius: var(--radius-sm); font-size: 13.5px; box-shadow: 0 12px 30px -12px rgba(13,12,11,0.5); }
 .toast-error{ background: #3a1a12; }
+
+/* ==========================================================================
+   Payment step (js/payment.js) — between checkout and the order tracker
+   ========================================================================== */
+.pay-summary{ display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-sm); padding: var(--space-sm); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--ivory); }
+.pay-summary-right{ text-align: right; }
+.pay-summary-label{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.pay-summary-token{ font-family: var(--font-outlier); font-variant-numeric: tabular-nums; font-size: 20px; margin-top: 2px; }
+.pay-amount{ font-family: var(--font-outlier); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 700; margin-top: 2px; }
+.pay-expiry{ font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); margin-top: var(--space-xs); }
+.pay-expiry:empty{ display: none; }
+.pay-expiry[data-state="expired"]{ color: var(--danger); font-weight: 700; }
+.payment-body{ margin-top: var(--space-md); }
+/* Pin the header to the very top of the scrolling sheet, covering its top padding, so nothing scrolls visibly above it. */
+.sheet-payment .sheet-head{ top: calc(-1 * var(--space-md)); margin-top: calc(-1 * var(--space-md)); padding-top: calc(var(--space-md) + 4px); }
+.payment-body .primary-btn{ margin-top: var(--space-sm); }
+.pay-lead{ font-size: 14px; line-height: 1.55; color: var(--ink); }
+.pay-badge{ font-size: 12.5px; line-height: 1.45; font-weight: 700; color: var(--ink); background: var(--cream); border: 1px dashed var(--ink-soft); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: var(--space-sm); }
+.pay-link-btn{ display: block; margin: var(--space-2xs) auto 0; min-height: 44px; padding: 0 var(--space-sm); background: none; border: none; color: var(--ink-soft); font-size: 13px; text-decoration: underline; cursor: pointer; }
+.pay-link-btn:hover{ color: var(--black); }
+#payment-error{ margin-top: var(--space-sm); }
+

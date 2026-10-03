@@ -2,8 +2,9 @@ DE.25 by Harshali — Website Demo (Cakes, Savouries, Sips)
 ==========================================================
 
 This is a working demo of the DE.25 website: real menu, real photos, a
-server-authoritative cart/checkout, a demo delivery estimate that is
-architected to switch to a live Borzo connection later, a constrained
+server-authoritative cart/checkout, automatic courier booking through
+Borzo's Business API (demo by default, Borzo's sandbox with a free test
+token, real riders once Borzo onboarding is done), a constrained
 "Food Guide" assistant that only ever answers from DE.25's own menu data,
 a live owner-facing orders dashboard, and an order-notification system
 (WhatsApp to the owner and the customer) that stays in a safe demo mode
@@ -109,8 +110,8 @@ The site works completely out of the box with .env left at its defaults —
 there is no external API key required to demo the full flow (menu, cart,
 checkout, demo delivery estimate, order status, Food Guide, custom-cake
 enquiry, owner dashboard, order notifications). The only things .env
-controls today are: whether Borzo live delivery is switched on (see
-DELIVERY below), whether the admin API + owner dashboard are enabled (see
+controls today are: which delivery mode is active — demo, Borzo sandbox
+or Borzo production (see DELIVERY below), whether the admin API + owner dashboard are enabled (see
 OWNER DASHBOARD below), and whether WhatsApp notifications actually send
 instead of just logging (see ORDER NOTIFICATIONS below).
 
@@ -218,29 +219,114 @@ menu — fix the sheet/credentials and restart to retry. See
 server/products/GoogleSheetsProductsProvider.js for the full column
 reference and this design's other tradeoffs.
 
-DELIVERY: DEMO NOW, BORZO-READY LATER
------------------------------------------
-Every delivery quote and order shown right now is clearly labelled "Demo
-Delivery Estimate" — this is intentional. Borzo has not yet approved/
-onboarded DE.25, so BORZO_DELIVERY_ENABLED is false by default and no
-request is ever sent to Borzo's servers.
+PAYMENTS: RAZORPAY (UPI QR FIRST), DEMO
+---------------------------------------
+Checkout no longer confirms an order by itself. Every order is saved as
+"Awaiting Payment", and only a paid order reaches the kitchen, the courier
+and the notifications. Unpaid orders are cancelled after
+PAYMENT_WINDOW_MINUTES (default 30). One of two methods is active,
+resolved in server/payments/paymentConfig.js and shown on the owner
+dashboard's Payments panel:
 
-The checkout flow never talks to a delivery provider directly — it goes
-through server/delivery/index.js, which picks a provider based on the
-BORZO_DELIVERY_ENABLED flag:
-  - false (default): server/delivery/DemoDeliveryProvider.js — a
-    deterministic, clearly-labelled placeholder estimate.
-  - true (once you have real credentials): server/delivery/
-    BorzoDeliveryProvider.js — calls Borzo's real Business API.
+  Demo (default)   No payment set up. The payment screen shows a labelled
+                   "Simulate payment (no money moves)" button, and every
+                   such order is tagged as simulated on the dashboard.
+                   Refused when NODE_ENV=production.
+  Razorpay         RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET. Razorpay's own
+                   checkout window opens on the site as soon as the order is
+                   placed, on the UPI QR first (scan with GPay, PhonePe,
+                   Paytm…), with cards, netbanking and wallets below. Test
+                   keys move no real money, and the whole UI says "test
+                   mode".
 
-To go live once Borzo approves DE.25 and issues credentials:
-  1. Set BORZO_API_KEY (and BORZO_API_SECRET/BORZO_API_URL if Borzo gives
-     you different values than the default) in .env
-  2. Set BORZO_DELIVERY_ENABLED=true
-  3. Restart the server
-No frontend or checkout code needs to change — the UI already renders
-whatever the active provider returns and switches its "Demo" vs "Live"
-badge automatically based on the provider's own isLive flag.
+Nobody confirms a payment by hand. A paid order confirms itself through
+whichever of these reaches the server first:
+
+  1. Checkout callback  the browser hands over Razorpay's signed result;
+                        the server checks the HMAC with the key secret.
+  2. Webhook            RAZORPAY_WEBHOOK_SECRET + a webhook to
+                        /api/payments/razorpay/webhook (needs a public
+                        https URL) — instant, even if the tab was closed.
+  3. Reconciler         every 15 s the server asks Razorpay about each order
+                        still awaiting payment — catches a QR paid on a phone
+                        while the callback never came, and works on localhost.
+
+The customer's screen and the owner dashboard both refresh every 5 s, so the
+order flips to "Payment confirmed" (and the dashboard chimes) on its own.
+
+The amount always comes from the server's own price calculation, never from
+the browser. A Razorpay payment is only accepted when its signature, gateway
+order id and amount all match. If a payment arrives after the window closed,
+it's honoured, never lost: Razorpay is asked once more before an order is
+cancelled, and a late payment still confirms it.
+
+Going live with Razorpay: account activation (KYC, a bank account, and
+refund/cancellation, terms, privacy and contact pages on the site), then
+swap the rzp_test_ keys for rzp_live_ keys and add the webhook. No code
+changes are needed.
+
+DELIVERY: DEMO, BORZO SANDBOX, BORZO PRODUCTION
+-------------------------------------------------
+Every paid order is handed to a courier automatically. The checkout flow
+never talks to a courier directly: it goes through server/lib/placeOrder.js
+and server/delivery/index.js, which picks one of three modes from .env
+(all resolved in server/delivery/borzoConfig.js):
+
+  Demo (default)   DemoDeliveryProvider — a deterministic placeholder,
+                   labelled "Demo Delivery Estimate" everywhere. Nothing is
+                   sent to Borzo.
+  Borzo sandbox    BORZO_DELIVERY_ENABLED=true + BORZO_AUTH_TOKEN +
+                   PICKUP_ADDRESS + PICKUP_PHONE (BORZO_ENV defaults to
+                   test). Real Borzo API at robotapitest-in.borzodelivery.com:
+                   real price quotes, real Borzo order ids and tracking
+                   pages — but Borzo never dispatches a rider and never
+                   charges. Labelled "Borzo sandbox" in the UI.
+  Borzo production Everything above + BORZO_ENV=production +
+                   BORZO_LIVE_CONFIRM=yes-dispatch-real-couriers. Real
+                   riders, real wallet charges (needs Borzo KYC and a funded
+                   wallet). One switch without the other stays on demo.
+
+What happens per order (Borzo modes):
+  1. Checkout asks Borzo for a price (calculate-order). If Borzo rejects
+     the address, the customer is told before anything is charged.
+  2. The order is saved, then create-order books the courier. create-order
+     is never retried automatically: Borzo has no idempotency key, so a
+     blind retry could book two couriers. A failed booking is shown on the
+     dashboard as "Courier booking failed" so the owner can arrange it.
+  3. A background sync (one batched GET /orders every BORZO_SYNC_MS,
+     default 20s) keeps the courier status, rider name and tracking link
+     current, and moves the kitchen status forward only: picked up ->
+     Out for Delivery, delivered -> Delivered. Polling, not Borzo's
+     callback, because a callback needs a public HTTPS URL.
+
+Getting a sandbox token (free, self-serve, no KYC):
+  1. Register at https://apitest.borzodelivery.com/in/ (needs a phone
+     number and an SMS code — do this yourself).
+  2. Copy the API token from the sandbox dashboard's API settings into
+     BORZO_AUTH_TOKEN in .env. A sandbox token only works on the sandbox.
+  3. Set BORZO_DELIVERY_ENABLED=true and PICKUP_PHONE, then restart.
+The token is only ever read by the server: it is sent to Borzo in the
+X-DV-Auth-Token header and nowhere else — never to the browser, never
+into the activity log.
+
+THE BORZO PANEL (top of the owner dashboard)
+  - Setup: which mode is active and exactly which .env value is missing.
+  - Live API log: every HTTPS exchange with Borzo — endpoint, HTTP status,
+    latency, Borzo's own error codes, and the full request/response
+    (phone numbers masked, token never stored). Kept in
+    data/borzo-activity.json (gitignored), newest 300 calls.
+  - Run live connection check: a real price request to BOTH Borzo hosts
+    right now. With no token Borzo answers HTTP 400 required_auth_token —
+    that is Borzo's own server proving it is reachable and enforcing auth.
+    With a token, the configured environment returns a real quote. The
+    token is only ever sent to the environment it belongs to. Also on the
+    command line: npm run borzo:check
+  - Create sample orders: 1-5 illustrative orders from five Navi Mumbai
+    localities, run through the real checkout path. In sandbox mode each
+    becomes a real Borzo test booking with its own id and tracking page.
+    Samples are tagged "Sample" everywhere, use the shop's own phone as
+    the drop-off contact, switch Borzo's SMS off, never send a customer
+    receipt, and are refused outright on production.
 
 OWNER DASHBOARD (http://localhost:3000/admin/)
 ------------------------------------------------
@@ -396,13 +482,12 @@ To go live with real WhatsApp messages:
   4. Set WHATSAPP_NOTIFICATIONS_ENABLED=true and restart the server.
 No frontend or checkout code needs to change — same pattern as Borzo.
 
-Live delivery-partner tracking (the "track my delivery guy" feature) has
-an architectural slot reserved for it once Borzo is actually live and
-assigning real couriers with real phone numbers and GPS — but it is
-intentionally NOT built as a fake moving map today, because there is no
-real courier to track yet. Building that would mean showing customers and
-the owner false information. Once Borzo is live, this is the next
-feature to build on top of the delivery-order data Borzo already returns.
+Delivery tracking links to Borzo's own tracking page (only ever an https
+borzodelivery.com URL that Borzo returned for that order) and shows the
+rider's name once Borzo assigns one. There is deliberately no home-made
+moving map: a map is only as true as the GPS behind it, and Borzo's page
+already shows the real one. Sandbox bookings are labelled as such — they
+get a real Borzo tracking page, but no rider is ever dispatched.
 
 THE FOOD GUIDE (bottom-right "Food Guide" button)
 ------------------------------------------------------
@@ -476,7 +561,8 @@ PROJECT LAYOUT
                       supabaseAuth.js, adminAuthConfig.js
     products/        product-catalog backend (JSON file + Google Sheets)
     orders/          order-storage backend (JSON file + Supabase Postgres)
-    delivery/        DeliveryProvider abstraction (Demo + Borzo stub)
+    delivery/        DeliveryProvider abstraction (Demo + Borzo v1.8), Borzo
+                      config, API activity log, connection check, status sync
     notifications/   NotificationProvider abstraction (Demo + WhatsApp stub)
     ai/              the deterministic Food Guide engine
     middleware/      security headers, rate limiting, admin auth, errors
@@ -501,6 +587,7 @@ PROJECT LAYOUT
   data/categories-sheet-template.csv  Google Sheets import template (Categories tab)
   data/orders.json          order history (gitignored — contains customer PII)
   data/notifications.json   demo notification log (gitignored — contains PII)
+  data/borzo-activity.json  Borzo API call log (gitignored — masked phones, no token)
 
 NEXT STEPS TOWARD GOING LIVE
 ---------------------------------
@@ -511,16 +598,19 @@ NEXT STEPS TOWARD GOING LIVE
   - Get real photos for Dark Chocolate Cake and Fruit Cake and swap out
     their illustrated placeholders (see WHAT'S REAL above).
   - Get the real domain and swap out every example.com reference.
-  - Get Borzo credentials once DE.25's onboarding is approved, then flip
-    BORZO_DELIVERY_ENABLED (see DELIVERY above) — no other code changes.
+  - Add a Borzo sandbox token and PICKUP_PHONE and run sample orders
+    through Borzo's sandbox (see DELIVERY above). For real riders: Borzo
+    business KYC + a funded wallet, then BORZO_ENV=production and
+    BORZO_LIVE_CONFIRM — no other code changes.
   - Set up WhatsApp Business + get a message template approved, then flip
     WHATSAPP_NOTIFICATIONS_ENABLED (see ORDER NOTIFICATIONS above) — no
     other code changes.
-  - Once Borzo is live and assigning real couriers, build live
-    delivery-partner tracking on top of that real data (see ORDER
-    NOTIFICATIONS above for why this isn't built against fake data today).
-  - Decide on a real payment flow (UPI/cards via a PCI-compliant
-    provider) — checkout is currently a demo flow with no real charge.
+  - Once Borzo production is live, register a Borzo callback URL on the
+    deployed domain so status changes arrive instantly instead of on the
+    20-second sync (see DELIVERY above).
+  - Payments (see PAYMENTS above): Razorpay test keys are free and work
+    today; live Razorpay needs account activation, then the rzp_live_ keys
+    and the webhook.
   - Move the menu to Google Sheets (see PRODUCT CATALOG above) if DE.25
     wants to edit prices/availability without a developer.
   - Move order storage to Supabase Postgres (see ORDER STORAGE above)

@@ -32,6 +32,8 @@ create table if not exists public.orders (
   delivery_quote     jsonb,
   payment_method     text not null,
   delivery_order_id  text,
+  delivery           jsonb,
+  is_sample          boolean not null default false,
   status             text not null,
   status_history     jsonb not null default '[]'::jsonb,
   created_at         timestamptz not null default now()
@@ -41,6 +43,18 @@ create table if not exists public.orders (
 -- by id, and the customer-facing "My Orders" feature looks orders up by
 -- phone number (server/orders/SupabaseOrdersStore.js's getOrdersByPhone)
 -- — these are the access patterns worth indexing for.
+-- Added with the Borzo integration. Safe to re-run on an existing table:
+-- the courier booking record (Borzo order id, status, tracking link,
+-- courier) and the flag marking dashboard-generated sample orders.
+alter table public.orders add column if not exists delivery jsonb;
+alter table public.orders add column if not exists is_sample boolean not null default false;
+-- Added with online payments. Safe to re-run: the payment record (method,
+-- status, amount in paise, Razorpay ids or UPI UTR, who verified it) and
+-- whether the customer verified their WhatsApp number at checkout (the
+-- receipt is only sent after payment, so this has to be remembered).
+alter table public.orders add column if not exists payment jsonb;
+alter table public.orders add column if not exists customer_phone_verified boolean not null default false;
+
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_customer_phone_idx on public.orders ((customer ->> 'phone'));
 

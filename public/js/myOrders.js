@@ -40,7 +40,7 @@ function renderResults(orders) {
 
   wrap.innerHTML = `<div class="myorders-list">${orders
     .map((order, i) => {
-      const isDone = order.status === "DELIVERED";
+      const isDone = order.status === "DELIVERED" || order.status === "CANCELLED";
       return `
         <button type="button" class="myorders-item" data-index="${i}">
           <div class="myorders-item-head">

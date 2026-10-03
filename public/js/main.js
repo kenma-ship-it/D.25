@@ -1,6 +1,7 @@
 import { initMenu } from "./menu.js";
 import { initCart } from "./cart.js";
 import { initCheckout } from "./checkout.js";
+import { initPayment } from "./payment.js";
 import { initProductDetail } from "./productDetail.js";
 import { initOrderStatus } from "./orderStatus.js";
 import { initAiGuide } from "./aiGuide.js";
@@ -23,6 +24,7 @@ function boot() {
     initMenu,
     initCart,
     initCheckout,
+    initPayment,
     initProductDetail,
     initOrderStatus,
     initAiGuide,

@@ -16,7 +16,8 @@
  * as the other factories — the difference is purely that this comment
  * spells out why that matters more here.
  */
-const { JsonFileOrdersStore, STATUSES } = require("./JsonFileOrdersStore");
+const { JsonFileOrdersStore } = require("./JsonFileOrdersStore");
+const { STATUSES, ALL_STATUSES, AWAITING_PAYMENT, CANCELLED } = require("./statuses");
 const { SupabaseOrdersStore } = require("./SupabaseOrdersStore");
 
 let cachedStore = null;
@@ -69,6 +70,15 @@ function advanceStatus(orderId) {
 function setDeliveryOrderId(orderId, deliveryOrderId) {
   return getStore().setDeliveryOrderId(orderId, deliveryOrderId);
 }
+function setDelivery(orderId, delivery) {
+  return getStore().setDelivery(orderId, delivery);
+}
+function setPayment(orderId, payment, opts) {
+  return getStore().setPayment(orderId, payment, opts);
+}
+function startDemoProgression(orderId) {
+  return getStore().startDemoProgression(orderId);
+}
 function getActiveStoreName() {
   return getStore().name;
 }
@@ -86,7 +96,13 @@ module.exports = {
   setStatus,
   advanceStatus,
   setDeliveryOrderId,
+  setDelivery,
+  setPayment,
+  startDemoProgression,
   getActiveStoreName,
   STATUSES,
+  ALL_STATUSES,
+  AWAITING_PAYMENT,
+  CANCELLED,
   _resetProviderCache,
 };

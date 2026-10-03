@@ -45,7 +45,10 @@ const checkoutSchema = z.object({
   items: z.array(cartItemSchema).min(1, "Your cart is empty.").max(30),
   deliveryOption: z.enum(["home-delivery"]).default("home-delivery"),
   // Online payment only — there is deliberately no cash/pay-later option.
-  paymentMethod: z.literal("upi", { errorMap: () => ({ message: "Please choose an online payment method." }) }),
+  // Which online method (Razorpay or demo) is the server's choice, from its
+  // own config — see server/payments/paymentConfig.js. "upi" is the old form
+  // value, still accepted from pages cached before the rename.
+  paymentMethod: z.enum(["online", "upi"], { errorMap: () => ({ message: "Please choose an online payment method." }) }),
   // Proof the customer controls customer.phone (WhatsApp one-time code).
   // Required whenever this deployment can send codes — see routes/checkout.js.
   phoneVerificationToken: z.string().trim().max(200).optional(),

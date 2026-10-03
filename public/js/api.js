@@ -41,6 +41,10 @@ export const api = {
   priceCart: (items) => request("/api/cart/price", { method: "POST", body: JSON.stringify({ items }) }),
   getDeliveryQuote: (address) => request("/api/delivery/quote", { method: "POST", body: JSON.stringify({ address }) }),
   checkout: (payload) => request("/api/checkout", { method: "POST", body: JSON.stringify(payload) }),
+  razorpayVerify: (orderId, body) =>
+    request(`/api/payments/${encodeURIComponent(orderId)}/razorpay/verify`, { method: "POST", body: JSON.stringify(body) }),
+  razorpayRefresh: (orderId) => request(`/api/payments/${encodeURIComponent(orderId)}/razorpay/refresh`, { method: "POST", body: "{}" }),
+  demoSimulate: (orderId) => request(`/api/payments/${encodeURIComponent(orderId)}/demo/simulate`, { method: "POST", body: "{}" }),
   getOrder: (orderId) => request(`/api/orders/${encodeURIComponent(orderId)}`),
   getOrdersByPhone: (phone, verificationToken) =>
     request(`/api/orders/by-phone/${encodeURIComponent(phone)}`, {
