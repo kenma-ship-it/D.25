@@ -1,0 +1,362 @@
+[
+  {
+    "type": "customer_order_slip",
+    "orderId": "c1571ace-e0e8-4cf5-b252-c971f63fc816",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder W10\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:47:39.965Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "c1571ace-e0e8-4cf5-b252-c971f63fc816",
+    "to": null,
+    "message": "New order W10 - Rs 209\nClaude Test (Razorpay test card) - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_TjLFMRHVuhrOPP)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:47:39.962Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "998b0de7-366a-4cd1-a8ec-e571d9b01e0b",
+    "to": null,
+    "message": "New order Z67 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to shop UPI ID - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.802Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "09a50039-f36d-4e48-af1a-79ca1831b9fd",
+    "to": null,
+    "message": "New order V80 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis, UTR 625185360515 - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.692Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "c02f5b71-5ee7-47b7-bfe7-893f9388d303",
+    "to": null,
+    "message": "New order K97 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_WHff3aaae935)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.574Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "88e03268-95b5-4cc6-857f-ebf278a6cb6c",
+    "to": null,
+    "message": "New order A73 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUB0c23a1c1593f)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.489Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "5f33bb1a-1efa-43bd-8278-dbfe5b01ff07",
+    "to": null,
+    "message": "New order C22 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUB368056cbc0e5)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.406Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "6049df9f-413a-44f8-bab5-fa09f06f1ceb",
+    "to": null,
+    "message": "New order C05 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:44.143Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "48946782-46e0-44d4-8806-a99652b66000",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder T74\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:43.870Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "48946782-46e0-44d4-8806-a99652b66000",
+    "to": null,
+    "message": "New order T74 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: SIMULATED (demo mode - no money received)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:17:43.867Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "4bf91af1-2fe8-444d-9bf1-336004654236",
+    "to": null,
+    "message": "New order Z63 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to shop UPI ID - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:03.002Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "23537fcc-3a06-442c-bac0-8c0d5fa917dd",
+    "to": null,
+    "message": "New order B42 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis, UTR 634313718869 - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.880Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "6b7af18e-1e42-4f55-903c-a6a29ca7c56e",
+    "to": null,
+    "message": "New order U37 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_WH9e8c1a4c78)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.774Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "6880efc8-a08d-46eb-b25f-f0da6f5e2c9d",
+    "to": null,
+    "message": "New order N85 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUBd09530dccc96)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.696Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "030f542f-31d0-4dd9-969f-343a2e6ed5b2",
+    "to": null,
+    "message": "New order Y39 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUBdec73f4cb74d)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.618Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "c9398fc1-cf2a-4b61-8bfd-5c811dd53ed1",
+    "to": null,
+    "message": "New order Q32 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.355Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "addcfb4f-2c41-4a5a-9b59-5f0c4a434142",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder E24\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.087Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "addcfb4f-2c41-4a5a-9b59-5f0c4a434142",
+    "to": null,
+    "message": "New order E24 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: SIMULATED (demo mode - no money received)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:12:02.081Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "9d53abe2-f7ae-488d-af14-72822f07eae0",
+    "to": null,
+    "message": "New order T63 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to shop UPI ID - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.814Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "ffed1c22-8597-410c-a936-e25236da9446",
+    "to": null,
+    "message": "New order P91 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis, UTR 936362234026 - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.741Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "6fce9c4b-c080-4fe4-a763-a5c4ca432124",
+    "to": null,
+    "message": "New order F32 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_WHd91f69149d)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.650Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "b0e6f296-89f7-4247-ac6e-402ee9357fad",
+    "to": null,
+    "message": "New order B43 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUB59c8640d6d8b)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.570Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "b73830af-21e1-4fc8-a47c-26d7546d5228",
+    "to": null,
+    "message": "New order J61 - Rs 209\nPayment Test - 9000000201\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1, Sector 5, Ghansoli, Navi Mumbai, 400701\nPayment: Paid online via Razorpay [TEST MODE - no real money] (pay_STUB278707e121af)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.492Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "e7a4c7a0-4a25-4443-ab08-6f4e2dcfd88d",
+    "to": null,
+    "message": "New order M39 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: UPI to de25.test@okaxis - confirmed by owner",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:36.238Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "3043d28a-a0bf-4e10-8c9f-29dce7b30126",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder Z67\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:35.975Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "3043d28a-a0bf-4e10-8c9f-29dce7b30126",
+    "to": null,
+    "message": "New order Z67 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: SIMULATED (demo mode - no money received)",
+    "isLive": false,
+    "sentAt": "2026-10-03T06:03:35.972Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "c1a63cba-f0be-4662-bbbe-c182e9680e97",
+    "to": "7208490409",
+    "message": "Thank you for your order from DE.25!\n\nOrder B63\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 216\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:38:15.914Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "c1a63cba-f0be-4662-bbbe-c182e9680e97",
+    "to": null,
+    "message": "New order B63 - Rs 216\nAryan - 7208490409\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 1801, NEWA, AIROLI, THANE, 400708\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:38:15.913Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "a648fbe3-3d3e-47fd-9dff-ea7870693050",
+    "to": null,
+    "message": "New order A00 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:36:30.652Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "7bbae122-a447-43b7-b50a-1db3119c74c1",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder W15\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:36:30.485Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "7bbae122-a447-43b7-b50a-1db3119c74c1",
+    "to": null,
+    "message": "New order W15 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:36:30.483Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "b066d34c-5622-44db-b4b7-e9a0d9d723d5",
+    "to": null,
+    "message": "[SAMPLE - not a real customer] New order D35 - Rs 564\nSample — Meera - 9000000105\n1 x Classic Chocolate Brownie - Rs 60\n2 x Chocolate Truffle Loaf - Rs 440\nDeliver to: C-9, Sample Park, Sector 21, Nerul, Navi Mumbai, 400706\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:34:27.410Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "16e5712e-df7a-49f6-9c55-020949c5ae29",
+    "to": null,
+    "message": "[SAMPLE - not a real customer] New order E19 - Rs 286\nSample — Kabir - 9000000104\n1 x Ragi Jaggery Brownie - Rs 70\n1 x Tiramisu - Rs 150\nDeliver to: Plot 22, Sample Enclave, Sector 8, Airoli, Navi Mumbai, 400708\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:34:27.404Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "50adafca-cd0b-452f-8187-5636222c3ec2",
+    "to": null,
+    "message": "[SAMPLE - not a real customer] New order W17 - Rs 651\nSample — Ananya - 9000000103\n1 x Tiramisu - Rs 150\n2 x Chocolate Truffle Loaf - Rs 440\nDeliver to: A-501, Sample Towers, Sector 17, Vashi, Navi Mumbai, 400703 (near Opp. Inorbit Mall)\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:34:27.398Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "f3cb5ccc-8a5b-49e4-80da-f3a9503c5d21",
+    "to": "9000000199",
+    "message": "Thank you for your order from DE.25!\n\nOrder U05\n1 x Classic Chocolate Brownie - Rs 60\nTotal: Rs 119\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:32:11.070Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "f3cb5ccc-8a5b-49e4-80da-f3a9503c5d21",
+    "to": null,
+    "message": "New order U05 - Rs 119\nTest Customer - 9000000199\n1 x Classic Chocolate Brownie - Rs 60\nDeliver to: Flat 12, Test Residency, Sector 7, Ghansoli, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:32:11.060Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "6fb5e7d1-f240-4227-a1a2-2e6b40cabf16",
+    "to": null,
+    "message": "New order Z13 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:55.103Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "34f4ee2b-78b4-432b-a9db-f56975f3025c",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder R50\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:54.930Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "34f4ee2b-78b4-432b-a9db-f56975f3025c",
+    "to": null,
+    "message": "New order R50 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:54.927Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "ab22a515-9d3e-4297-8cc0-2dcddd115198",
+    "to": null,
+    "message": "New order Q66 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:46.015Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "ddfaef67-eeea-492d-a64e-defc2212d058",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder R31\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:45.831Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "ddfaef67-eeea-492d-a64e-defc2212d058",
+    "to": null,
+    "message": "New order R31 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:28:45.828Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "108105bb-46e4-4d25-ab6d-cf0f016bd52f",
+    "to": null,
+    "message": "New order T81 - Rs 209\nTest Customer - 9822222222\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:24:27.972Z"
+  },
+  {
+    "type": "customer_order_slip",
+    "orderId": "b7ffac5c-cd88-4301-910e-8a4f8adcb761",
+    "to": "9811111111",
+    "message": "Thank you for your order from DE.25!\n\nOrder K62\n1 x Blueberry Cheesecake - Rs 150\nTotal: Rs 209\n\nDE.25 is preparing and delivering this order directly for now.\n\nQuestions about your order? Call DE.25.",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:24:27.796Z"
+  },
+  {
+    "type": "owner_new_order",
+    "orderId": "b7ffac5c-cd88-4301-910e-8a4f8adcb761",
+    "to": null,
+    "message": "New order K62 - Rs 209\nTest Customer - 9811111111\n1 x Blueberry Cheesecake - Rs 150\nDeliver to: 12, Main Road, Sector 5, Navi Mumbai, 400701\nPayment: Online (UPI)",
+    "isLive": false,
+    "sentAt": "2026-10-03T05:24:27.793Z"
+  }
+]

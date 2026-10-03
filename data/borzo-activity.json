@@ -1,0 +1,346 @@
+[
+  {
+    "id": "d0dc7ecd-c274-43b3-afd8-af890095cbe1",
+    "at": "2026-10-03T05:36:32.069Z",
+    "environment": "test",
+    "host": "https://robotapitest-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 311,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "35fb9789-22b2-4be4-8641-32143a8cf843",
+    "at": "2026-10-03T05:36:32.037Z",
+    "environment": "production",
+    "host": "https://robot-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 252,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "5c6819d3-3bed-4b08-a9ec-c2799e9acf02",
+    "at": "2026-10-03T05:35:16.906Z",
+    "environment": "test",
+    "host": "https://robotapitest-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 217,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "d36eee92-ab75-48f8-ae39-54f5a41f9739",
+    "at": "2026-10-03T05:35:16.873Z",
+    "environment": "production",
+    "host": "https://robot-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 183,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "1c192b62-d3cf-4342-b225-5ee5280c3d83",
+    "at": "2026-10-03T05:34:14.146Z",
+    "environment": "production",
+    "host": "https://robot-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 310,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "dd3373c8-f548-42fe-b16d-1a47d2efc739",
+    "at": "2026-10-03T05:34:14.143Z",
+    "environment": "test",
+    "host": "https://robotapitest-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 419,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "3c4f17df-3968-4e16-9edf-e3339436f875",
+    "at": "2026-10-03T05:30:26.122Z",
+    "environment": "test",
+    "host": "https://robotapitest-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 493,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  },
+  {
+    "id": "dc5486fc-38bf-4a9a-a7d1-7d35cc49c128",
+    "at": "2026-10-03T05:30:26.115Z",
+    "environment": "production",
+    "host": "https://robot-in.borzodelivery.com",
+    "method": "POST",
+    "endpoint": "/calculate-order",
+    "path": "/api/business/1.8/calculate-order",
+    "purpose": "connection-check",
+    "authenticated": false,
+    "deOrderId": null,
+    "latencyMs": 405,
+    "request": {
+      "matter": "Connection check — cake (price check only, no booking)",
+      "vehicle_type_id": 8,
+      "total_weight_kg": 2,
+      "points": [
+        {
+          "address": "DE.25 by Harshali, Ghansoli, Navi Mumbai, Maharashtra 400701"
+        },
+        {
+          "address": "Sector 17, Palm Beach Road, Vashi, Navi Mumbai, Maharashtra 400703"
+        }
+      ]
+    },
+    "httpStatus": 400,
+    "ok": false,
+    "outcome": "api_error",
+    "errors": [
+      "required_auth_token"
+    ],
+    "parameterErrors": null,
+    "warnings": [],
+    "borzoOrderId": null,
+    "summary": "required_auth_token",
+    "response": {
+      "is_successful": false,
+      "errors": [
+        "required_auth_token"
+      ],
+      "parameter_errors": null
+    }
+  }
+]
